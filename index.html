@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日/周报填写3.1</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>日/周报填写3.1</h1>
+        <div class="menu">
+            <button onclick="showEmployeeIdInput()" class="btn btn-primary">成员入口</button>
+            <button onclick="showAdminLogin()" class="btn btn-secondary">管理员入口</button>
+        </div>
+        
+        <!-- 管理员登录弹窗 -->
+        <div id="adminLoginModal" class="modal">
+            <div class="modal-content admin-login-modal">
+                <span class="close" onclick="closeAdminLogin()">&times;</span>
+                <h2>管理员登录</h2>
+                <input type="password" id="adminPassword" placeholder="请输入管理员口令">
+                <button onclick="checkAdminPassword()" class="btn btn-primary">登录</button>
+                <p id="loginError" class="error"></p>
+            </div>
+        </div>
+        
+        <!-- 成员确认弹窗 -->
+        <div id="memberConfirmModal" class="modal">
+            <div class="modal-content member-confirm-modal">
+                <span class="close" onclick="closeMemberConfirm()">&times;</span>
+                <h2>成员身份确认</h2>
+                <div id="memberInfo"></div>
+                <div class="modal-actions">
+                    <button onclick="closeMemberConfirm()" class="btn btn-secondary">取消</button>
+                    <button onclick="confirmMember()" class="btn btn-primary">确认</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 工号输入弹窗 -->
+        <div id="employeeIdModal" class="modal">
+            <div class="modal-content employee-id-modal">
+                <span class="close" onclick="closeEmployeeIdInput()">&times;</span>
+                <h2>请输入工号</h2>
+                <p>请输入您的员工工号以验证身份：</p>
+                <input type="text" id="employeeId" placeholder="请输入您的员工工号" class="form-control">
+                <div class="modal-actions">
+                    <button onclick="closeEmployeeIdInput()" class="btn btn-secondary">取消</button>
+                    <button onclick="confirmEmployeeId()" class="btn btn-primary">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

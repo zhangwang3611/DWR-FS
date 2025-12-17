@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员页面</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>管理员页面</h1>
+        <div class="header-buttons">
+            <button onclick="window.location.href='index.html'" class="btn btn-back">返回首页</button>
+        </div>
+        
+        <div class="admin-tabs">
+            <button onclick="showTab('data')" class="tab-btn active">数据查看</button>
+            <button onclick="showTab('templates')" class="tab-btn">模板设置</button>
+            <button onclick="showTab('settings')" class="tab-btn">项目管理</button>
+            <button onclick="showTab('members')" class="tab-btn">成员管理</button>
+        </div>
+        
+        <!-- 模板设置 -->
+        <div id="templates" class="tab-content">
+            <div class="template-group">
+                <h2>日报模板</h2>
+                <textarea id="dailyTemplate" placeholder="日报模板
+{date} 日报
+
+成员：{memberName}
+项目：{project}
+
+今日进展：
+{todayProgress}
+
+明日计划：
+{tomorrowPlan}"></textarea>
+                <button onclick="saveTemplate('daily')" class="btn btn-primary">保存日报模板</button>
+            </div>
+            
+            <div class="template-group">
+                <h2>周报模板</h2>
+                <textarea id="weeklyTemplate" placeholder="周报模板
+【数据小组】——{memberName}
+一、本周完成工作：
+{weeklyDone}
+
+二、下周工作计划：
+{weeklyPlan}
+
+三、需要协调的问题：
+{problems}
+
+四、其他事项：
+{others}"></textarea>
+                <button onclick="saveTemplate('weekly')" class="btn btn-primary">保存周报模板</button>
+            </div>
+        </div>
+        
+        <!-- 数据查看 -->
+        <div id="data" class="tab-content active">
+            <div class="data-filters">
+                <select id="dataReportType">
+                    <option value="daily">日报</option>
+                    <option value="weekly">周报</option>
+                </select>
+                <input type="date" id="dataDate">
+                <button onclick="loadReportData()" class="btn btn-primary">查看数据</button>
+                <button onclick="generateReport()" class="btn btn-secondary">生成报告</button>
+                <button onclick="showMissingMembers()" class="btn btn-secondary">查看未填写日志成员</button>
+            </div>
+            
+            <div id="reportData" class="report-data">
+                <!-- 数据将动态加载 -->
+            </div>
+        </div>
+        
+        <!-- 报告详情弹窗 -->
+        <div id="reportDetailModal" class="modal">
+            <div class="modal-content report-detail-modal">
+                <div class="modal-header">
+                    <h2 id="modalTitle">报告详情</h2>
+                    <span class="close" onclick="closeModal()">&times;</span>
+                </div>
+                <div id="modalBody" class="modal-body">
+                    <!-- 详情内容将动态加载 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 生成报告弹窗 -->
+        <div id="generatedReportModal" class="modal">
+            <div class="modal-content report-generated-modal">
+                <div class="modal-header">
+                    <h2 id="generatedReportTitle">生成的报告</h2>
+                    <span class="close" onclick="closeGeneratedReportModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <textarea id="generatedReportContent" rows="25" style="width:100%;font-family:monospace;"></textarea>
+                    <div style="text-align:right;margin-top:10px;">
+                        <button onclick="copyReportContent()" class="btn btn-primary">复制报告内容</button>
+                        <button onclick="closeGeneratedReportModal()" class="btn btn-secondary">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 未填写成员列表弹窗 -->
+        <div id="missingMembersModal" class="modal">
+            <div class="modal-content missing-members-modal">
+                <div class="modal-header">
+                    <h2 id="missingMembersTitle">未填写成员列表</h2>
+                    <span class="close" onclick="closeMissingMembersModal()">&times;</span>
+                </div>
+                <div id="missingMembersBody" class="modal-body">
+                    <!-- 未填写成员内容将动态加载 -->
+                </div>
+                <div class="modal-footer">
+                    <button onclick="closeMissingMembersModal()" class="btn btn-primary">关闭</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 提示弹窗 -->
+        <div id="alertModal" class="modal">
+            <div class="modal-content alert-modal">
+                <div class="modal-header">
+                    <h2>提示</h2>
+                    <span class="close" onclick="closeAlertModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div id="alertMessage"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="closeAlertModal()">确定</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 项目管理 -->
+        <div id="settings" class="tab-content">
+            <div class="settings-group">
+                <h2>项目管理</h2>
+                <div id="projectsList" class="projects-list">
+                    <!-- 项目列表将动态加载 -->
+                </div>
+                <div class="add-project">
+                    <input type="text" id="newProject" placeholder="输入新项目名称">
+                    <button onclick="addProject()" class="btn btn-primary">添加项目</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 成员管理 -->
+        <div id="members" class="tab-content">
+            <div class="settings-group">
+                <h2>成员管理</h2>
+                <div id="membersList" class="members-list">
+                    <!-- 成员列表将动态加载 -->
+                </div>
+                <div class="add-member">
+                    <input type="text" id="newMemberName" placeholder="输入成员姓名">
+                    <input type="text" id="newEmployeeId" placeholder="输入成员工号">
+                    <button onclick="addMember()" class="btn btn-primary">添加成员</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

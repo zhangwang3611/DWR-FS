@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成员填写页面</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>日报周报填写</h1>
+        <div class="header-buttons">
+            <button onclick="loadYesterdayReport()" class="btn btn-secondary btn-load-yesterday">填充昨日内容</button>
+            <button onclick="showLogsModal()" class="btn btn-secondary">查看历史日志</button>
+            <button onclick="window.location.href='index.html'" class="btn btn-back">返回首页</button>
+        </div>
+        
+        <form id="reportForm">
+            <!-- 成员姓名（隐藏字段，用于显示当前用户） -->
+            <input type="hidden" id="memberName">
+            <!-- 报告类型、当前用户、当前日期在同一行 -->
+            <div class="form-group inline-group">
+                <label for="reportType">报告类型：</label>
+                <select id="reportType" onchange="toggleReportType()" style="margin-right: 20px;">
+                    <option value="daily">日报</option>
+                    <option value="weekly">周报</option>
+                </select>
+                <label>当前用户：</label>
+                <span id="currentMemberDisplay"></span>
+                <label style="margin-left: 20px;">当前日期：</label>
+                <span id="currentDateDisplay"></span>
+            </div>
+            
+            <!-- 报告ID（隐藏字段） -->
+            <input type="hidden" id="reportId">
+            
+            <!-- 日报内容 -->
+            <div id="dailyContent" class="report-content">
+                <h3>今日进展</h3>
+                <div id="todayProgress" class="content-group">
+                    <div class="content-item">
+                        <select class="log-project" required>
+                            <option value="">请选择项目</option>
+                        </select>
+                        <div class="custom-select log-members">
+                        <div class="select-trigger">
+                            <div class="selected-tags"></div>
+                            <span class="caret">▼</span>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="dropdown-content">
+                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            </div>
+                        </div>
+                        <input type="hidden" class="selected-members" name="members" required>
+                    </div>
+                        <input type="text" placeholder="今日进展" required>
+                        <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+                        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+                    </div>
+                </div>
+                <button type="button" onclick="addContentItem('todayProgress')" class="btn btn-add">+ 添加今日进展</button>
+                <span class="error-text" id="todayProgressError"></span>
+                
+                <h3>明日计划</h3>
+                <div id="tomorrowPlan" class="content-group">
+                    <div class="content-item">
+                        <select class="log-project" required>
+                            <option value="">请选择项目</option>
+                        </select>
+                        <div class="custom-select log-members">
+                        <div class="select-trigger">
+                            <div class="selected-tags"></div>
+                            <span class="caret">▼</span>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="dropdown-content">
+                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            </div>
+                        </div>
+                        <input type="hidden" class="selected-members" name="members" required>
+                    </div>
+                        <input type="text" placeholder="明日计划" required>
+                        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+                    </div>
+                </div>
+                <button type="button" onclick="addContentItem('tomorrowPlan')" class="btn btn-add">+ 添加明日计划</button>
+                <span class="error-text" id="tomorrowPlanError"></span>
+            </div>
+            
+            <!-- 周报内容 -->
+            <div id="weeklyContent" class="report-content" style="display: none;">
+                <h3>本周完成工作</h3>
+                <div id="weeklyDone" class="content-group">
+                    <div class="content-item">
+                        <select class="log-project" required>
+                            <option value="">请选择项目</option>
+                        </select>
+                        <div class="custom-select log-members">
+                        <div class="select-trigger">
+                            <div class="selected-tags"></div>
+                            <span class="caret">▼</span>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="dropdown-content">
+                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            </div>
+                        </div>
+                        <input type="hidden" class="selected-members" name="members" required>
+                    </div>
+                        <input type="text" placeholder="本周完成工作" required>
+                        <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+                        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+                    </div>
+                </div>
+                <button type="button" onclick="addContentItem('weeklyDone')" class="btn btn-add">+ 添加本周完成</button>
+                <span class="error-text" id="weeklyDoneError"></span>
+                
+                <h3>下周工作计划</h3>
+                <div id="weeklyPlan" class="content-group">
+                    <div class="content-item">
+                        <select class="log-project" required>
+                            <option value="">请选择项目</option>
+                        </select>
+                        <div class="custom-select log-members">
+                        <div class="select-trigger">
+                            <div class="selected-tags"></div>
+                            <span class="caret">▼</span>
+                        </div>
+                        <div class="select-dropdown">
+                            <div class="dropdown-content">
+                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            </div>
+                        </div>
+                        <input type="hidden" class="selected-members" name="members" required>
+                    </div>
+                        <input type="text" placeholder="下周工作计划" required>
+                        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+                    </div>
+                </div>
+                <button type="button" onclick="addContentItem('weeklyPlan')" class="btn btn-add">+ 添加下周计划</button>
+                <span class="error-text" id="weeklyPlanError"></span>
+            </div>
+            
+            <button type="button" class="btn btn-primary btn-save" onclick="saveReport();">保存入库</button>
+        </form>
+        
+        <div id="successMessage" class="success-message" style="display: none;">
+            保存成功！
+        </div>
+        
+
+    </div>
+    
+    <!-- 历史日志弹窗 -->
+    <div id="logsModal" class="modal">
+        <div class="modal-content logs-modal">
+            <div class="modal-header">
+                <h2>历史日志</h2>
+                <span class="close" onclick="closeLogsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- 筛选控件 -->
+                <div class="filter-controls">
+                    <div class="form-group">
+                        <label for="logTypeFilter">日志类型：</label>
+                        <select id="logTypeFilter">
+                            <option value="all">全部</option>
+                            <option value="daily">日报</option>
+                            <option value="weekly">周报</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="startDateFilter">开始日期：</label>
+                        <input type="date" id="startDateFilter">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="endDateFilter">结束日期：</label>
+                        <input type="date" id="endDateFilter">
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary" onclick="filterLogs()">筛选</button>
+                    <button type="button" class="btn btn-secondary" onclick="resetFilters()">重置</button>
+                </div>
+                
+                <!-- 日志列表 -->
+                <div class="logs-list" id="logsList">
+                    <!-- 日志条目将通过JavaScript动态生成 -->
+                </div>
+                
+                <!-- 分页组件 -->
+                <div class="pagination" id="pagination">
+                    <button type="button" class="btn btn-secondary" id="prevPage">上一页</button>
+                    <span id="pageInfo">第 1 页，共 1 页</span>
+                    <button type="button" class="btn btn-secondary" id="nextPage">下一页</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提示弹窗 -->
+    <div id="alertModal" class="modal">
+        <div class="modal-content alert-modal">
+            <div class="modal-header">
+                <h2>提示</h2>
+                <span class="close" onclick="closeAlertModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="alertMessage"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeAlertModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
