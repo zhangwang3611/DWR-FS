@@ -839,12 +839,23 @@ textarea {
     margin-bottom: 15px;
     padding-bottom: 10px;
     border-bottom: 1px solid #eee;
+    gap: 20px;
+}
+
+.log-header > span {
+    flex-shrink: 0;
 }
 
 .log-date {
     font-weight: bold;
     color: #2c3e50;
     font-size: 1.1em;
+}
+
+.log-member {
+    color: #3498db;
+    font-weight: bold;
+    font-size: 1em;
 }
 
 .log-type {

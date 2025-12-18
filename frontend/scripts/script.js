@@ -1,5 +1,5 @@
 // 全局变量
-const ADMIN_PASSWORD = '1'; // 管理员默认口令
+// 管理员默认口令将从配置文件中获取
 
 
 
@@ -72,7 +72,7 @@ function confirmMember() {
         
         // 关闭弹窗并跳转到成员页面
         closeMemberConfirm();
-        window.location.href = 'member.html';
+        window.location.href = 'frontend/pages/member.html';
     }
 }
 
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 这里简单检查document.referrer是否包含index.html
         if (!document.referrer.includes('index.html')) {
             alert('您没有权限直接访问此页面，请从首页进入');
-            window.location.href = 'index.html';
+            window.location.href = '/index.html';
             return;
         }
         initAdminPage();
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (!memberStr && !document.referrer.includes('index.html')) {
             alert('您没有权限直接访问此页面，请从首页进入');
-            window.location.href = 'index.html';
+            window.location.href = '/index.html';
             return;
         }
         initMemberPage();
@@ -148,8 +148,8 @@ function checkAdminPassword() {
     const password = document.getElementById('adminPassword').value;
     const errorElement = document.getElementById('loginError');
     
-    if (password === ADMIN_PASSWORD) {
-        window.location.href = 'admin.html';
+    if (password === CONFIG.ADMIN_PASSWORD) {
+        window.location.href = 'frontend/pages/admin.html';
     } else {
         errorElement.textContent = '口令错误，请重试';
     }
@@ -440,7 +440,7 @@ let dataVersions = {};
 // 从服务器获取数据（处理版本信息）
 async function getDataFromServer(key, defaultValue = []) {
     try {
-        const response = await fetch(`http://192.168.53.2:10086/api/data/${key}`);
+        const response = await fetch(`${CONFIG.API_BASE_URL}${key}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -470,7 +470,7 @@ async function saveDataToServer(key, data) {
             version: dataVersions[key] || 0
         };
         
-        const response = await fetch(`http://192.168.53.2:10086/api/data/${key}`, {
+        const response = await fetch(`${CONFIG.API_BASE_URL}${key}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1882,7 +1882,7 @@ function resetFilters() {
 }
 
 // 渲染日志列表
-function renderLogs() {
+async function renderLogs() {
     const logsList = document.getElementById('logsList');
     const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
     
@@ -1900,6 +1900,15 @@ function renderLogs() {
         return;
     }
     
+    // 获取所有成员数据，用于转换员工ID为姓名
+    const allMembers = await getFromLocalStorage('members', []);
+    
+    // 辅助函数：根据员工ID获取姓名
+    const getMemberNameById = (employeeId) => {
+        const member = allMembers.find(m => m.employeeId === employeeId);
+        return member ? member.name : employeeId; // 如果找不到，返回员工ID
+    };
+    
     // 渲染日志条目
     currentLogs.forEach(log => {
         const logItem = document.createElement('div');
@@ -1914,22 +1923,37 @@ function renderLogs() {
 
         // 构建日志内容
         let logContent = '';
+        // 辅助函数：构建单个工作项的HTML
+        const buildWorkItemHTML = (item) => {
+            let itemHTML = `项目: ${item.project || '未选择项目'} - ${item.content || item}`;
+            // 添加成员信息
+            if (item.members && item.members.length > 0) {
+                const memberNames = item.members.map(getMemberNameById);
+                itemHTML += `，成员: ${memberNames.join(', ')}`;
+            }
+            // 添加进度信息
+            if (item.progress !== undefined) {
+                itemHTML += `，${getProgressText(item.progress)}`;
+            }
+            return itemHTML;
+        };
+        
         if (log.type === 'daily') {
             logContent = `
                 <div class="log-detail">
                     <strong>今日进展：</strong>
-                    <ul>${log.todayProgress.map(item => `<li>项目: ${item.project || '未选择项目'} - ${item.content || item}${item.progress !== undefined ? '，' + getProgressText(item.progress) : ''}</li>`).join('')}</ul>
+                    <ul>${log.todayProgress.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}</ul>
                     <strong>明日计划：</strong>
-                    <ul>${log.tomorrowPlan.map(item => `<li>项目: ${item.project || '未选择项目'} - ${item.content || item}${item.progress !== undefined ? '，' + getProgressText(item.progress) : ''}</li>`).join('')}</ul>
+                    <ul>${log.tomorrowPlan.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}</ul>
                 </div>
             `;
         } else {
             logContent = `
                 <div class="log-detail">
                     <strong>本周完成工作：</strong>
-                    <ul>${log.weeklyDone.map(item => `<li>项目: ${item.project || '未选择项目'} - ${item.content || item}${item.progress !== undefined ? '，' + getProgressText(item.progress) : ''}</li>`).join('')}</ul>
+                    <ul>${log.weeklyDone.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}</ul>
                     <strong>下周工作计划：</strong>
-                    <ul>${log.weeklyPlan.map(item => `<li>项目: ${item.project || '未选择项目'} - ${item.content || item}${item.progress !== undefined ? '，' + getProgressText(item.progress) : ''}</li>`).join('')}</ul>
+                    <ul>${log.weeklyPlan.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}</ul>
                 </div>
             `;
         }
@@ -1938,6 +1962,7 @@ function renderLogs() {
         logItem.innerHTML = `
             <div class="log-header">
                 <span class="log-date">${log.date}</span>
+                <span class="log-member">${log.memberName}</span>
                 <span class="log-type log-type-${log.type}">${log.type === 'daily' ? '日报' : '周报'}</span>
             </div>
             ${logContent}

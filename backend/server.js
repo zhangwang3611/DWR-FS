@@ -3,8 +3,12 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 10086;
-const DATA_FILE = './data.json';
+// 导入配置文件
+const config = require('../config/backend-config');
+
+const PORT = config.PORT;
+const DATA_FILE = config.DATA_FILE;
+const SERVER_IP = config.SERVER_IP;
 
 // MIME types for common file types
 const mimeTypes = {
@@ -272,9 +276,13 @@ const server = http.createServer((req, res) => {
     }
 
     // Determine file path for static files
-    let filePath = '.' + req.url;
-    if (filePath === './') {
-        filePath = './index.html';
+    let filePath;
+    if (req.url === '/') {
+        // 如果访问根路径，使用项目根目录下的index.html
+        filePath = '../index.html';
+    } else {
+        // 否则，使用相对于项目根目录的路径
+        filePath = '../' + req.url;
     }
 
     // Determine MIME type
@@ -302,7 +310,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`Server running at http://192.168.53.2:${PORT}/`);
+    console.log(`Server running at http://${SERVER_IP}:${PORT}/`);
     console.log('API endpoints:');
     console.log('  GET /api/data - Get all data');
     console.log('  POST /api/data - Save all data');
