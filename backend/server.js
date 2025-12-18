@@ -5,9 +5,12 @@ const path = require('path');
 
 // 导入配置文件
 const config = require('../config/backend-config');
+// 导入日志工具
+const logger = require('./logger');
 
 const PORT = config.PORT;
-const DATA_FILE = config.DATA_FILE;
+const DATA_FILE = path.join(__dirname, '..', config.DATA_FILE);
+const REPORTS_FILE = path.join(__dirname, '..', config.REPORTS_FILE);
 const SERVER_IP = config.SERVER_IP;
 
 // MIME types for common file types
@@ -20,47 +23,115 @@ const mimeTypes = {
 };
 
 // Helper function to initialize data file with versioned structure
-const initializeDataFile = (callback) => {
-    const initialData = {};
-    writeData(initialData, callback);
+const initializeDataFile = (filePath, callback) => {
+    // 确保目录存在
+    const dirPath = path.dirname(filePath);
+    fs.mkdirSync(dirPath, { recursive: true });
+    
+    // 根据文件路径决定初始数据
+    let initialData = {};
+    if (filePath === REPORTS_FILE) {
+        // 如果是reports.json，初始化为包含reports对象的结构
+        initialData = {
+            reports: {
+                data: [],
+                version: 1
+            }
+        };
+    } else {
+        // 其他文件初始化为空对象
+        initialData = {};
+    }
+    
+    fs.writeFile(filePath, JSON.stringify(initialData, null, 2), 'utf8', (err) => {
+        if (err) {
+            logger.error('Error initializing data file:', err);
+            return callback(err);
+        }
+        logger.info('Data file initialized successfully:', filePath);
+        callback(null);
+    });
 };
 
 // Helper function to read data from file
 const readData = (callback) => {
-    fs.readFile(DATA_FILE, 'utf8', (err, data) => {
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // File doesn't exist, initialize it
-                console.log('Data file not found, creating new one');
-                initializeDataFile((initErr) => {
-                    if (initErr) {
-                        return callback(initErr);
+    // Read both files and merge them
+    fs.readFile(DATA_FILE, 'utf8', (err1, data1) => {
+        if (err1) {
+            if (err1.code === 'ENOENT') {
+                // Data file doesn't exist, initialize it
+                logger.info('Data file not found, creating new one');
+                initializeDataFile(DATA_FILE, (initErr1) => {
+                    if (initErr1) {
+                        return callback(initErr1);
                     }
+                    // After initializing, read again
                     readData(callback);
                 });
                 return;
+            } else {
+                logger.error('Error reading data file:', err1);
+                return callback(err1);
             }
-            console.error('Error reading data file:', err);
-            return callback(err);
         }
-        try {
-            const parsedData = JSON.parse(data);
-            callback(null, parsedData);
-        } catch (parseErr) {
-            console.error('Error parsing JSON:', parseErr);
-            callback(parseErr);
-        }
+        
+        fs.readFile(REPORTS_FILE, 'utf8', (err2, data2) => {
+            if (err2) {
+                if (err2.code === 'ENOENT') {
+                    // Reports file doesn't exist, initialize it
+                    logger.info('Reports file not found, creating new one');
+                    initializeDataFile(REPORTS_FILE, (initErr2) => {
+                        if (initErr2) {
+                            return callback(initErr2);
+                        }
+                        // After initializing, read again
+                        readData(callback);
+                    });
+                    return;
+                } else {
+                    logger.error('Error reading reports file:', err2);
+                    return callback(err2);
+                }
+            }
+            
+            try {
+                const mainData = JSON.parse(data1);
+                const reportsData = JSON.parse(data2);
+                // Merge the data
+                const mergedData = { ...mainData, ...reportsData };
+                callback(null, mergedData);
+            } catch (parseErr) {
+                logger.error('Error parsing JSON:', parseErr);
+                callback(parseErr);
+            }
+        });
     });
 };
 
 // Helper function to write data to file
 const writeData = (data, callback) => {
-    fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf8', (err) => {
-        if (err) {
-            console.error('Error writing data file:', err);
-            return callback(err);
+    // Split data into main data and reports data
+    const mainData = { ...data };
+    const reportsData = { reports: mainData.reports };
+    
+    // Remove reports from main data
+    delete mainData.reports;
+    
+    // Write to both files
+    fs.writeFile(DATA_FILE, JSON.stringify(mainData, null, 2), 'utf8', (err1) => {
+        if (err1) {
+            logger.error('Error writing data file:', err1);
+            return callback(err1);
         }
-        callback(null);
+        
+        fs.writeFile(REPORTS_FILE, JSON.stringify(reportsData, null, 2), 'utf8', (err2) => {
+            if (err2) {
+                logger.error('Error writing reports file:', err2);
+                return callback(err2);
+            }
+            
+            callback(null);
+        });
     });
 };
 
@@ -144,7 +215,7 @@ const updateVersionedData = (data, key, newData, oldVersion) => {
 };
 
 const server = http.createServer((req, res) => {
-    console.log(`Request for ${req.url} received`);
+    logger.info(`Request for ${req.url} received`);
     
     // API endpoints for data persistence
     if (req.url.startsWith('/api/data')) {
@@ -277,12 +348,15 @@ const server = http.createServer((req, res) => {
 
     // Determine file path for static files
     let filePath;
+    // 使用绝对路径，基于项目根目录
+    const projectRoot = path.join(__dirname, '..');
+    
     if (req.url === '/') {
         // 如果访问根路径，使用项目根目录下的index.html
-        filePath = './index.html';
+        filePath = path.join(projectRoot, 'index.html');
     } else {
-        // 否则，使用相对于项目根目录的路径
-        filePath = '.' + req.url;
+        // 否则，使用相对于项目根目录的绝对路径
+        filePath = path.join(projectRoot, req.url);
     }
 
     // Determine MIME type
@@ -310,21 +384,21 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`Server running at http://${SERVER_IP}:${PORT}/`);
-    console.log('API endpoints:');
-    console.log('  GET /api/data - Get all data');
-    console.log('  POST /api/data - Save all data');
-    console.log('  GET /api/data/:key - Get specific data item');
-    console.log('  POST /api/data/:key - Save specific data item');
+    logger.info(`Server running at http://${SERVER_IP}:${PORT}/`);
+    logger.info('API endpoints:');
+    logger.info('  GET /api/data - Get all data');
+    logger.info('  POST /api/data - Save all data');
+    logger.info('  GET /api/data/:key - Get specific data item');
+    logger.info('  POST /api/data/:key - Save specific data item');
 });
 
 server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-        console.error(`Error: Port ${PORT} is already in use`);
-        console.error('Please stop the existing server or change the port in config/backend-config.js');
+        logger.error(`Error: Port ${PORT} is already in use`);
+        logger.error('Please stop the existing server or change the port in config/backend-config.js');
         process.exit(1);
     } else {
-        console.error('Server error:', err);
+        logger.error('Server error:', err);
         process.exit(1);
     }
 });
