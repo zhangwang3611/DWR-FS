@@ -360,7 +360,10 @@ async function addContentItem(containerId) {
     // 只有非计划部分才添加完成进度输入字段
     if (!isPlanSection) {
         innerHTML += `
-            <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+            <div class="progress-container">
+                <input type="number" class="log-progress" placeholder="进度" min="1" max="100" required>
+                <span class="progress-percent">%</span>
+            </div>
         `;
     }
     
@@ -1716,7 +1719,10 @@ async function fillContentItems(containerId, items) {
             // 只有非计划部分才添加完成进度输入字段
             if (!isPlanSection) {
                 innerHTML += `
-                    <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+                    <div class="progress-container">
+                        <input type="number" class="log-progress" placeholder="进度" min="1" max="100" required>
+                        <span class="progress-percent">%</span>
+                    </div>
                 `;
             }
             
@@ -1916,6 +1922,7 @@ async function renderLogs() {
         
         // 辅助函数：根据进度获取显示文本
         const getProgressText = (progress) => {
+            console.log('progress:', progress);
             if (progress === null || progress === undefined) return '进行中';
             if (progress === 100) return '已完成';
             return `已完成${progress}%`;
@@ -1926,14 +1933,14 @@ async function renderLogs() {
         // 辅助函数：构建单个工作项的HTML
         const buildWorkItemHTML = (item) => {
             let itemHTML = `项目: ${item.project || '未选择项目'} - ${item.content || item}`;
-            // 添加成员信息
-            if (item.members && item.members.length > 0) {
-                const memberNames = item.members.map(getMemberNameById);
-                itemHTML += `，成员: ${memberNames.join(', ')}`;
-            }
             // 添加进度信息
             if (item.progress !== undefined) {
                 itemHTML += `，${getProgressText(item.progress)}`;
+            }
+            // 添加成员信息
+            if (item.members && item.members.length > 0) {
+                const memberNames = item.members.map(getMemberNameById);
+                itemHTML += ` —— ${memberNames.join('、')}`;
             }
             return itemHTML;
         };
@@ -2706,7 +2713,7 @@ async function showReportDetail(report) {
                 const content = item.content || '';
                 const members = item.members ? getMemberNames(item.members).join('、') : '';
                 const progressText = item.progress !== undefined ? `，${getProgressText(item.progress)}` : '';
-                html += `<li>${index + 1}. ${project} - ${content}${progressText} (${members})</li>`;
+                html += `<li>${index + 1}. ${project} - ${content}${progressText} ——${members}；</li>`;
             });
         } else {
             html += `<li>暂无今日进展</li>`;
@@ -2720,7 +2727,7 @@ async function showReportDetail(report) {
                 const content = item.content || '';
                 const members = item.members ? getMemberNames(item.members).join('、') : '';
                 const progressText = item.progress !== undefined ? `，${getProgressText(item.progress)}` : '';
-                html += `<li>${index + 1}. ${project} - ${content}${progressText} (${members})</li>`;
+                html += `<li>${index + 1}. ${project} - ${content}${progressText} ——${members}；</li>`;
             });
         } else {
             html += `<li>暂无明日计划</li>`;
@@ -2735,7 +2742,7 @@ async function showReportDetail(report) {
                 const content = item.content || '';
                 const members = item.members ? getMemberNames(item.members).join('、') : '';
                 const progressText = item.progress !== undefined ? `，${getProgressText(item.progress)}` : '';
-                html += `<li>${index + 1}. ${project} - ${content}${progressText} (${members})</li>`;
+                html += `<li>${index + 1}. ${project} - ${content}${progressText} ——${members}；</li>`;
             });
         } else {
             html += `<li>暂无本周完成工作</li>`;
@@ -2749,7 +2756,7 @@ async function showReportDetail(report) {
                 const content = item.content || '';
                 const members = item.members ? getMemberNames(item.members).join('、') : '';
                 const progressText = item.progress !== undefined ? `，${getProgressText(item.progress)}` : '';
-                html += `<li>${index + 1}. ${project} - ${content}${progressText} (${members})</li>`;
+                html += `<li>${index + 1}. ${project} - ${content}${progressText} ——${members}；</li>`;
             });
         } else {
             html += `<li>暂无下周工作计划</li>`;

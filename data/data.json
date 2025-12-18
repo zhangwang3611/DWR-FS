@@ -103,25 +103,80 @@
         "employeeId": "005724",
         "todayProgress": [
           {
-            "content": "奥迪",
-            "project": "数据治理平台",
+            "content": "数据集管理-数据导入代码优化整理",
+            "project": "AI模型管理",
             "members": [
               "005724"
+            ],
+            "progress": 10
+          },
+          {
+            "content": "cube-studio数据集相关功能研究",
+            "project": "AI模型管理",
+            "members": [
+              "005724"
+            ]
+          },
+          {
+            "content": "bug修改",
+            "project": "数据治理平台",
+            "members": [
+              "005724",
+              "004231"
             ]
           }
         ],
         "tomorrowPlan": [
           {
-            "content": "奔驰",
-            "project": "数据治理平台",
+            "content": "继续",
+            "project": "AI模型管理",
+            "members": [
+              "005724"
+            ]
+          },
+          {
+            "content": "现场支持",
+            "project": "数据分析",
+            "members": [
+              "005721"
+            ]
+          },
+          {
+            "content": "4444",
+            "project": "数据集成平台",
             "members": [
               "005724"
             ]
           }
         ]
+      },
+      {
+        "id": 1766023390331,
+        "type": "daily",
+        "date": "2025-12-18",
+        "memberName": "纪锐鑫",
+        "employeeId": "005721",
+        "todayProgress": [
+          {
+            "content": "50%",
+            "project": "数据分析",
+            "members": [
+              "005721"
+            ]
+          }
+        ],
+        "tomorrowPlan": [
+          {
+            "content": "5",
+            "project": "数据分析",
+            "members": [
+              "005721"
+            ]
+          }
+        ]
       }
     ],
-    "version": 123
+    "version": 136
   },
   "projects": {
     "data": [

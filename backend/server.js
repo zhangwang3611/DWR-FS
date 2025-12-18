@@ -279,10 +279,10 @@ const server = http.createServer((req, res) => {
     let filePath;
     if (req.url === '/') {
         // 如果访问根路径，使用项目根目录下的index.html
-        filePath = '../index.html';
+        filePath = './index.html';
     } else {
         // 否则，使用相对于项目根目录的路径
-        filePath = '../' + req.url;
+        filePath = '.' + req.url;
     }
 
     // Determine MIME type
@@ -316,4 +316,15 @@ server.listen(PORT, () => {
     console.log('  POST /api/data - Save all data');
     console.log('  GET /api/data/:key - Get specific data item');
     console.log('  POST /api/data/:key - Save specific data item');
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`Error: Port ${PORT} is already in use`);
+        console.error('Please stop the existing server or change the port in config/backend-config.js');
+        process.exit(1);
+    } else {
+        console.error('Server error:', err);
+        process.exit(1);
+    }
 });

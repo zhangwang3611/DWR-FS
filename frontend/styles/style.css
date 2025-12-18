@@ -390,20 +390,51 @@ textarea {
     display: none;
 }
 
-.content-item input {
+.content-item input:not(.log-progress) {
     flex: 1; /* 确保输入框占满剩余空间 */
     min-width: 200px; /* 设置最小宽度，防止在小屏幕上太窄 */
 }
 
+/* 进度容器样式 */
+.content-item .progress-container {
+    display: flex;
+    align-items: stretch;
+    flex: 0 0 85px; /* 固定总宽度：60px + 25px */
+    min-width: 85px;
+    gap: 0; /* 确保内部元素无间隙 */
+}
+
 /* 完成进度输入框样式 */
 .content-item input.log-progress {
-    flex: 0 0 120px; /* 固定宽度，能显示四个汉字长度 */
-    min-width: 120px; /* 最小宽度与固定宽度一致 */
+    flex: 0 0 60px; /* 固定宽度，能显示两个汉字长度 */
+    min-width: 60px; /* 最小宽度与固定宽度一致 */
     text-align: center; /* 居中显示进度数字 */
-    padding: 10px; /* 与其他输入框保持一致的内边距 */
-    border: 1px solid #ddd; /* 与其他输入框保持一致的边框 */
-    border-radius: 5px; /* 与其他输入框保持一致的圆角 */
-    font-size: 16px; /* 与其他输入框保持一致的字体大小 */
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-right: none;
+    border-radius: 5px 0 0 5px;
+    height: 40px; /* 固定高度确保对齐 */
+    box-sizing: border-box;
+    margin: 0;
+}
+
+/* 进度百分比符号样式 */
+.content-item .progress-percent {
+    flex: 0 0 25px;
+    min-width: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-left: none;
+    color: #666;
+    font-size: 16px;
+    border-radius: 0 5px 5px 0;
+    height: 40px; /* 与输入框相同高度 */
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 .error {

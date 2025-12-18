@@ -43,19 +43,22 @@
                             <option value="">请选择项目</option>
                         </select>
                         <div class="custom-select log-members">
-                        <div class="select-trigger">
-                            <div class="selected-tags"></div>
-                            <span class="caret">▼</span>
-                        </div>
-                        <div class="select-dropdown">
-                            <div class="dropdown-content">
-                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            <div class="select-trigger">
+                                <div class="selected-tags"></div>
+                                <span class="caret">▼</span>
                             </div>
+                            <div class="select-dropdown">
+                                <div class="dropdown-content">
+                                    <!-- 成员选项将通过JavaScript动态生成 -->
+                                </div>
+                            </div>
+                            <input type="hidden" class="selected-members" name="members" required>
                         </div>
-                        <input type="hidden" class="selected-members" name="members" required>
-                    </div>
                         <input type="text" placeholder="今日进展" required>
-                        <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+                        <div class="progress-container">
+                            <input type="number" class="log-progress" placeholder="进度" min="1" max="100" required>
+                            <span class="progress-percent">%</span>
+                        </div>
                         <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
                     </div>
                 </div>
@@ -69,17 +72,17 @@
                             <option value="">请选择项目</option>
                         </select>
                         <div class="custom-select log-members">
-                        <div class="select-trigger">
-                            <div class="selected-tags"></div>
-                            <span class="caret">▼</span>
-                        </div>
-                        <div class="select-dropdown">
-                            <div class="dropdown-content">
-                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            <div class="select-trigger">
+                                <div class="selected-tags"></div>
+                                <span class="caret">▼</span>
                             </div>
+                            <div class="select-dropdown">
+                                <div class="dropdown-content">
+                                    <!-- 成员选项将通过JavaScript动态生成 -->
+                                </div>
+                            </div>
+                            <input type="hidden" class="selected-members" name="members" required>
                         </div>
-                        <input type="hidden" class="selected-members" name="members" required>
-                    </div>
                         <input type="text" placeholder="明日计划" required>
                         <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
                     </div>
@@ -97,19 +100,22 @@
                             <option value="">请选择项目</option>
                         </select>
                         <div class="custom-select log-members">
-                        <div class="select-trigger">
-                            <div class="selected-tags"></div>
-                            <span class="caret">▼</span>
-                        </div>
-                        <div class="select-dropdown">
-                            <div class="dropdown-content">
-                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            <div class="select-trigger">
+                                <div class="selected-tags"></div>
+                                <span class="caret">▼</span>
                             </div>
+                            <div class="select-dropdown">
+                                <div class="dropdown-content">
+                                    <!-- 成员选项将通过JavaScript动态生成 -->
+                                </div>
+                            </div>
+                            <input type="hidden" class="selected-members" name="members" required>
                         </div>
-                        <input type="hidden" class="selected-members" name="members" required>
-                    </div>
                         <input type="text" placeholder="本周完成工作" required>
-                        <input type="number" class="log-progress" placeholder="完成进度" min="1" max="100" required>
+                        <div class="progress-container">
+                            <input type="number" class="log-progress" placeholder="进度" min="1" max="100" required>
+                            <span class="progress-percent">%</span>
+                        </div>
                         <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
                     </div>
                 </div>
@@ -123,17 +129,17 @@
                             <option value="">请选择项目</option>
                         </select>
                         <div class="custom-select log-members">
-                        <div class="select-trigger">
-                            <div class="selected-tags"></div>
-                            <span class="caret">▼</span>
-                        </div>
-                        <div class="select-dropdown">
-                            <div class="dropdown-content">
-                                <!-- 成员选项将通过JavaScript动态生成 -->
+                            <div class="select-trigger">
+                                <div class="selected-tags"></div>
+                                <span class="caret">▼</span>
                             </div>
+                            <div class="select-dropdown">
+                                <div class="dropdown-content">
+                                    <!-- 成员选项将通过JavaScript动态生成 -->
+                                </div>
+                            </div>
+                            <input type="hidden" class="selected-members" name="members" required>
                         </div>
-                        <input type="hidden" class="selected-members" name="members" required>
-                    </div>
                         <input type="text" placeholder="下周工作计划" required>
                         <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
                     </div>
