@@ -27,6 +27,8 @@ exit /b 1
 )
 
 echo Server is running, stopping it...
+
+rem Stop all processes listening on the port
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%PORT%') do (
     taskkill /f /pid %%a >nul 2>nul
     if %ERRORLEVEL% EQU 0 (
@@ -34,5 +36,22 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%PORT%') do (
     )
 )
 
-echo Server stopped successfully!
+rem Also stop all node processes related to the server
+for /f "tokens=2" %%a in ('tasklist /fi "IMAGENAME eq node.exe" /v ^| findstr /i "backend/server.js" ^| findstr /i "%CD%"') do (
+    taskkill /f /pid %%a >nul 2>nul
+    if %ERRORLEVEL% EQU 0 (
+        echo Stopped Node.js process %%a
+    )
+)
+
+rem Wait a moment for port to be released
+timeout /t 1 /nobreak >nul
+
+rem Verify port is released
+netstat -ano | findstr :%PORT% >nul 2>nul
+if %ERRORLEVEL% EQU 0 (
+    echo Warning: Port %PORT% might still be in use. Please wait a few seconds and try again.
+) else (
+    echo Server stopped successfully!
+)
 pause

@@ -1,13 +1,33 @@
 {
   "projects": {
     "data": [
-      "数据集成平台",
-      "数据治理平台",
-      "数据分析",
-      "AI模型管理",
-      "其他"
+      {
+        "name": "AI模型管理",
+        "milestoneNumber": "9",
+        "milestoneName": "2025AI模型管理平台提升里程碑"
+      },
+      {
+        "name": "数据治理平台",
+        "milestoneNumber": "8",
+        "milestoneName": "2025数据治理平台提升里程碑"
+      },
+      {
+        "name": "数据集成平台",
+        "milestoneNumber": "7",
+        "milestoneName": "2025数据集成平台提升里程碑"
+      },
+      {
+        "name": "数据分析",
+        "milestoneNumber": "6",
+        "milestoneName": "2025大数据智能分析平台提升里程碑"
+      },
+      {
+        "name": "其他",
+        "milestoneNumber": "8",
+        "milestoneName": "2025数据治理平台提升里程碑"
+      }
     ],
-    "version": 1
+    "version": 19
   },
   "dailyTemplate": {
     "data": "{tomorrow} 日报\n【数据小组】——李希明\n一、近期任务：\n （1）12.31，数据分析试点项目开发；\n （2）12.31，数据集成平台市监局项目实施工作；\n （3）持续进行高速数据仓库及数据工程服务建设；\n （4）持续进行数据治理、数据集成、数据分析等产品售前工作及资料编写；\n二、昨日进展：\n{todayProgress}\n三、今日计划：\n{tomorrowPlan}\n四、当前问题及风险：\n  无\n|\n",
@@ -93,5 +113,9 @@
       }
     ],
     "version": 10
+  },
+  "projectNumber": {
+    "data": "RD202410",
+    "version": 1
   }
 }

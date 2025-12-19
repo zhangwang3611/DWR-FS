@@ -141,11 +141,18 @@
         <div id="settings" class="tab-content">
             <div class="settings-group">
                 <h2>项目管理</h2>
+                <div class="project-number-setting">
+                    <label for="projectNumber">项目编号:</label>
+                    <input type="text" id="projectNumber" placeholder="输入项目编号">
+                    <button onclick="saveProjectNumber()" class="btn btn-primary">保存</button>
+                </div>
                 <div id="projectsList" class="projects-list">
                     <!-- 项目列表将动态加载 -->
                 </div>
                 <div class="add-project">
                     <input type="text" id="newProject" placeholder="输入新项目名称">
+                    <input type="text" id="newMilestoneNumber" placeholder="输入里程碑编号">
+                    <input type="text" id="newMilestoneName" placeholder="输入里程碑名称">
                     <button onclick="addProject()" class="btn btn-primary">添加项目</button>
                 </div>
             </div>

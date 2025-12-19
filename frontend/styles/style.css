@@ -67,6 +67,15 @@ h3 {
     background-color: #7f8c8d;
 }
 
+.btn-orange {
+    background-color: #3d2fc0;
+    color: #fff;
+}
+
+.btn-orange:hover {
+    background-color: #3d2fc0;
+}
+
 /* 头部按钮容器 */
 .header-buttons {
     position: absolute;
@@ -127,11 +136,12 @@ h3 {
     display: inline-block;
 }
 
-.btn-save {
-    display: block;
-    margin: 30px auto;
+.btn-save, .btn-sync-nerve {
+    display: inline-block;
+    margin: 30px 10px 30px 0;
     padding: 15px 30px;
     font-size: 18px;
+    vertical-align: middle;
 }
 
 /* 菜单样式 */
@@ -193,6 +203,31 @@ h3 {
     padding: 20px;
     max-width: 350px;
     max-height: 250px;
+}
+
+/* 数字神经登录弹窗特定样式 */
+.nerve-login-modal {
+    padding: 20px;
+    max-width: 350px;
+    max-height: 250px;
+}
+
+/* 弹窗按钮操作区域 */
+.modal-actions {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.modal-actions .btn {
+    margin-left: 10px;
+}
+
+/* 错误文本样式 */
+.error-text {
+    color: #d9534f;
+    font-size: 14px;
+    margin-top: 5px;
+    display: block;
 }
 
 .close {
@@ -550,6 +585,54 @@ textarea {
     border-bottom: 1px solid #eee;
 }
 
+.member-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.member-edit-form {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.member-edit-form input {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+/* 项目管理样式 */
+.project-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.project-edit-form {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.project-edit-form input {
+    padding: 5px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 14px;
+    min-width: 200px;
+}
+
 .member-info {
     display: flex;
     gap: 20px;
@@ -776,6 +859,229 @@ textarea {
     flex-direction: column;
     height: calc(90vh - 120px);
     overflow: hidden;
+}
+
+/* 今日进展日志弹窗特定样式 */
+.today-progress-modal {
+    width: 95%;
+    max-width: 1200px;
+    max-height: 90vh;
+}
+
+/* 今日进展表格样式 */
+.progress-table-container {
+    overflow-x: auto;
+    max-height: calc(90vh - 150px);
+    overflow-y: auto;
+}
+
+.progress-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.progress-table th {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: bold;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.progress-table td {
+    border: 1px solid #dee2e6;
+    padding: 12px 8px;
+    color: #212529;
+    vertical-align: top;
+}
+
+.progress-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.progress-table tr:hover {
+    background-color: #e9ecef;
+}
+
+.progress-table .no-data {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* 表格操作按钮 */
+.progress-table .action-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-right: 5px;
+}
+
+.progress-table .btn-delete {
+    background-color: #dc3545;
+    color: white;
+}
+
+.progress-table .btn-delete:hover {
+    background-color: #c82333;
+}
+
+.progress-table .btn-edit {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.progress-table .btn-edit:hover {
+    background-color: #e0a800;
+}
+
+/* 表格操作区域 */
+.table-actions {
+    margin-bottom: 15px;
+    text-align: right;
+}
+
+.table-actions .btn {
+    margin-left: 10px;
+    padding: 8px 15px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.table-actions .btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.table-actions .btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.table-actions .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.table-actions .btn-secondary:hover {
+    background-color: #545b62;
+}
+
+/* 可编辑单元格样式 */
+.editable-cell {
+    padding: 5px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    min-height: 25px;
+    outline: none;
+}
+
+.editable-cell:hover {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+}
+
+.editable-cell:focus {
+    background-color: white;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* 日志编辑按钮样式 */
+.btn-edit-log {
+    padding: 4px 8px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    float: right;
+    margin-top: -2px;
+}
+
+.btn-edit-log:hover {
+    background-color: #0056b3;
+}
+
+/* 日志编辑模式样式 */
+.log-content-edit {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.log-actions-edit {
+    margin-top: 15px;
+    text-align: right;
+}
+
+.btn-save-edit, .btn-cancel-edit {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+.btn-save-edit {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-save-edit:hover {
+    background-color: #218838;
+}
+
+.btn-cancel-edit {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-cancel-edit:hover {
+    background-color: #545b62;
+}
+
+/* 编辑模式下的内容项样式 */
+.log-content-edit .content-group {
+    margin-bottom: 20px;
+}
+
+.log-content-edit .content-item {
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: white;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+/* 可编辑下拉框样式 */
+.editable-select {
+    width: 100%;
+    padding: 5px;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    background-color: white;
+    font-size: 14px;
+    outline: none;
+}
+
+.editable-select:hover {
+    border-color: #007bff;
+}
+
+.editable-select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .alert-modal {

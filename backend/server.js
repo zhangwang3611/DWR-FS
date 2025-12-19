@@ -1,7 +1,9 @@
 // Simple HTTP server for testing with data persistence API
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const querystring = require('querystring');
 
 // 导入配置文件
 const config = require('../config/backend-config');
@@ -344,6 +346,145 @@ const server = http.createServer((req, res) => {
             });
             return;
         }
+    }
+    
+    // 登录接口代理转发
+    if (req.url === '/api/nerve/login' && req.method === 'POST') {
+        // 设置CORS头
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        // 处理OPTIONS请求（CORS预检）
+        if (req.method === 'OPTIONS') {
+            res.writeHead(200);
+            res.end();
+            return;
+        }
+        
+        // 读取请求体
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+            // 解析表单数据
+            let formData;
+            try {
+                if (req.headers['content-type'] && req.headers['content-type'].includes('application/json')) {
+                    formData = JSON.parse(body);
+                } else {
+                    // 处理表单数据
+                    formData = querystring.parse(body);
+                }
+            } catch (parseErr) {
+                logger.error('Error parsing login data:', parseErr);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid form data' }));
+                return;
+            }
+            
+            logger.info('登录代理请求参数:', formData);
+            
+            // 创建HTTPS agent以禁用证书验证
+            const httpsAgent = new https.Agent({
+                rejectUnauthorized: false,
+                timeout: 10000 // 设置10秒超时
+            });
+            
+            // 配置外部API请求选项
+            const externalApiOptions = {
+                hostname: '192.168.56.78',
+                path: '/cvicdns/xcom/rbac/loginAction.do',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Length': Buffer.byteLength(querystring.stringify(formData)),
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                agent: httpsAgent,
+                timeout: 10000 // 设置10秒超时
+            };
+            
+            // 发送请求到外部API
+            const externalReq = https.request(externalApiOptions, externalRes => {
+                logger.info(`外部登录API响应状态码: ${externalRes.statusCode}`);
+                logger.info(`外部登录API响应头: ${JSON.stringify(externalRes.headers)}`);
+                
+                // 收集响应体数据
+                let responseBody = '';
+                externalRes.on('data', chunk => {
+                    responseBody += chunk;
+                });
+                
+                externalRes.on('end', () => {
+                    // 设置CORS头
+                    const responseHeaders = {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Credentials': 'true'
+                    };
+                    
+                    // 从响应头中提取JSESSIONID Cookie
+                    let jsessionidCookie = null;
+                    if (externalRes.headers['set-cookie']) {
+                        logger.info(`外部登录API返回的Cookie: ${JSON.stringify(externalRes.headers['set-cookie'])}`);
+                        const cookieHeaders = externalRes.headers['set-cookie'];
+                        // 查找包含JSESSIONID的Cookie
+                        const jsessionidCookieHeader = cookieHeaders.find(cookie => 
+                            cookie.trim().startsWith('JSESSIONID=')
+                        );
+                        if (jsessionidCookieHeader) {
+                            // 提取JSESSIONID值
+                            const cookieRegex = /JSESSIONID=([a-zA-Z0-9]+)/;
+                            const match = jsessionidCookieHeader.match(cookieRegex);
+                            if (match) {
+                                jsessionidCookie = jsessionidCookieHeader;
+                            }
+                        }
+                    }
+                    
+                    // 检查响应体是否包含错误信息
+                    const hasError = responseBody.includes('用户名口令不匹配');
+                    
+                    // 构造响应数据
+                    const responseData = {
+                        success: !hasError,
+                        message: hasError ? '登录失败，用户名或密码错误' : '登录成功',
+                        cookie: jsessionidCookie,
+                        responseBody: responseBody
+                    };
+                    
+                    // 设置响应状态码
+                    const statusCode = hasError ? 401 : externalRes.statusCode;
+                    
+                    // 发送响应
+                    res.writeHead(statusCode, responseHeaders);
+                    res.end(JSON.stringify(responseData));
+                });
+            });
+            
+            // 处理请求超时
+            externalReq.on('timeout', () => {
+                logger.error('外部登录API请求超时');
+                externalReq.destroy();
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '登录服务超时' }));
+            });
+            
+            externalReq.on('error', error => {
+                logger.error('外部登录API请求失败:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: '登录服务不可用' }));
+            });
+            
+            // 发送请求体
+            externalReq.write(querystring.stringify(formData));
+            externalReq.end();
+        });
+        
+        return;
     }
 
     // Determine file path for static files

@@ -149,10 +149,32 @@
             </div>
             
             <button type="button" class="btn btn-primary btn-save" onclick="saveReport();">保存入库</button>
+            <button type="button" class="btn btn-orange btn-sync-nerve" style="display: none; margin-left: 10px;" onclick="syncToNerve();">同步到数字神经</button>
         </form>
         
         <div id="successMessage" class="success-message" style="display: none;">
-            保存成功！
+                保存成功！
+            </div>
+        
+        <!-- 数字神经登录弹窗 -->
+        <div id="nerveLoginModal" class="modal">
+            <div class="modal-content nerve-login-modal">
+                <div class="modal-header">
+                    <h2>数字神经登录</h2>
+                    <span class="close" onclick="closeNerveLoginModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="nervePassword">请输入数字神经密码：</label>
+                        <input type="password" id="nervePassword" class="form-control" placeholder="输入密码">
+                        <span class="error-text" id="nervePasswordError"></span>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-primary" onclick="submitNerveLogin()">确定</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeNerveLoginModal()">取消</button>
+                    </div>
+                </div>
+            </div>
         </div>
         
 
@@ -218,6 +240,22 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" onclick="closeAlertModal()">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 今日进展日志弹窗 -->
+    <div id="todayProgressModal" class="modal">
+        <div class="modal-content today-progress-modal">
+            <div class="modal-header">
+                <h2>今日进展日志</h2>
+                <span class="close" onclick="closeTodayProgressModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="todayProgressContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeTodayProgressModal()">确定</button>
             </div>
         </div>
     </div>

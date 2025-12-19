@@ -1,7 +1,163 @@
 // 全局变量
 // 管理员默认口令将从配置文件中获取
 
+// MD5加密函数
+function md5(input) {
+    // 简单的MD5实现（生产环境应使用更可靠的库）
+    function md5cycle(x, k) {
+        var a = x[0], b = x[1], c = x[2], d = x[3];
+        a = ff(a, b, c, d, k[0], 7, -680876936);
+        d = ff(d, a, b, c, k[1], 12, -389564586);
+        c = ff(c, d, a, b, k[2], 17,  606105819);
+        b = ff(b, c, d, a, k[3], 22, -1044525330);
+        a = ff(a, b, c, d, k[4], 7, -176418897);
+        d = ff(d, a, b, c, k[5], 12,  1200080426);
+        c = ff(c, d, a, b, k[6], 17, -1473231341);
+        b = ff(b, c, d, a, k[7], 22, -45705983);
+        a = ff(a, b, c, d, k[8], 7,  1770035416);
+        d = ff(d, a, b, c, k[9], 12, -1958414417);
+        c = ff(c, d, a, b, k[10], 17, -42063);
+        b = ff(b, c, d, a, k[11], 22, -1990404162);
+        a = ff(a, b, c, d, k[12], 7,  1804603682);
+        d = ff(d, a, b, c, k[13], 12, -40341101);
+        c = ff(c, d, a, b, k[14], 17, -1502002290);
+        b = ff(b, c, d, a, k[15], 22,  1236535329);
 
+        a = gg(a, b, c, d, k[1], 5, -165796510);
+        d = gg(d, a, b, c, k[6], 9, -1069501632);
+        c = gg(c, d, a, b, k[11], 14,  643717713);
+        b = gg(b, c, d, a, k[0], 20, -373897302);
+        a = gg(a, b, c, d, k[5], 5, -701558691);
+        d = gg(d, a, b, c, k[10], 9,  38016083);
+        c = gg(c, d, a, b, k[15], 14, -660478335);
+        b = gg(b, c, d, a, k[4], 20, -405537848);
+        a = gg(a, b, c, d, k[9], 5,  568446438);
+        d = gg(d, a, b, c, k[14], 9, -1019803690);
+        c = gg(c, d, a, b, k[3], 14, -187363961);
+        b = gg(b, c, d, a, k[8], 20,  1163531501);
+        a = gg(a, b, c, d, k[13], 5, -1444681467);
+        d = gg(d, a, b, c, k[2], 9, -51403784);
+        c = gg(c, d, a, b, k[7], 14,  1735328473);
+        b = gg(b, c, d, a, k[12], 20, -1926607734);
+
+        a = hh(a, b, c, d, k[5], 4, -378558);
+        d = hh(d, a, b, c, k[8], 11, -2022574463);
+        c = hh(c, d, a, b, k[11], 16,  1839030562);
+        b = hh(b, c, d, a, k[14], 23, -35309556);
+        a = hh(a, b, c, d, k[1], 4, -1530992060);
+        d = hh(d, a, b, c, k[4], 11,  1272893353);
+        c = hh(c, d, a, b, k[7], 16, -155497632);
+        b = hh(b, c, d, a, k[10], 23, -1094730640);
+        a = hh(a, b, c, d, k[13], 4,  681279174);
+        d = hh(d, a, b, c, k[0], 11, -358537222);
+        c = hh(c, d, a, b, k[3], 16, -722521979);
+        b = hh(b, c, d, a, k[6], 23,  76029189);
+        a = hh(a, b, c, d, k[9], 4, -640364487);
+        d = hh(d, a, b, c, k[12], 11, -421815835);
+        c = hh(c, d, a, b, k[15], 16,  530742520);
+        b = hh(b, c, d, a, k[2], 23, -995338651);
+
+        a = ii(a, b, c, d, k[0], 6, -198630844);
+        d = ii(d, a, b, c, k[7], 10,  1126891415);
+        c = ii(c, d, a, b, k[14], 15, -1416354905);
+        b = ii(b, c, d, a, k[5], 21, -57434055);
+        a = ii(a, b, c, d, k[12], 6,  1700485571);
+        d = ii(d, a, b, c, k[3], 10, -1894986606);
+        c = ii(c, d, a, b, k[10], 15, -1051523);
+        b = ii(b, c, d, a, k[1], 21, -2054922799);
+        a = ii(a, b, c, d, k[8], 6,  1873313359);
+        d = ii(d, a, b, c, k[15], 10, -30611744);
+        c = ii(c, d, a, b, k[6], 15, -1560198380);
+        b = ii(b, c, d, a, k[13], 21,  1309151649);
+        a = ii(a, b, c, d, k[4], 6, -145523070);
+        d = ii(d, a, b, c, k[11], 10, -1120210379);
+        c = ii(c, d, a, b, k[2], 15,  718787259);
+        b = ii(b, c, d, a, k[9], 21, -343485551);
+
+        x[0] = add32(a, x[0]);
+        x[1] = add32(b, x[1]);
+        x[2] = add32(c, x[2]);
+        x[3] = add32(d, x[3]);
+    }
+
+    function cmn(q, a, b, x, s, t) {
+        a = add32(add32(a, q), add32(x, t));
+        return add32((a << s) | (a >>> (32 - s)), b);
+    }
+
+    function ff(a, b, c, d, x, s, t) {
+        return cmn((b & c) | ((~b) & d), a, b, x, s, t);
+    }
+
+    function gg(a, b, c, d, x, s, t) {
+        return cmn((b & d) | (c & (~d)), a, b, x, s, t);
+    }
+
+    function hh(a, b, c, d, x, s, t) {
+        return cmn(b ^ c ^ d, a, b, x, s, t);
+    }
+
+    function ii(a, b, c, d, x, s, t) {
+        return cmn(c ^ (b | (~d)), a, b, x, s, t);
+    }
+
+    function md51(s) {
+        txt = '';
+        var n = s.length, state = [1732584193, -271733879, -1732584194, 271733878];
+        for (var i = 64; i <= s.length; i += 64) {
+            md5cycle(state, md5blk(s.substring(i - 64, i)));
+        }
+        s = s.substring(i - 64);
+        var tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        for (var j = 0; j < s.length; j++)
+            tail[j >> 2] |= s.charCodeAt(j) << ((j % 4) << 3);
+        tail[j >> 2] |= 0x80 << ((j % 4) << 3);
+        if (j > 55) {
+            md5cycle(state, tail);
+            for (var k = 0; k < 16; k++) tail[k] = 0;
+        }
+        tail[14] = n * 8;
+        md5cycle(state, tail);
+        return state;
+    }
+
+    function md5blk(s) {
+        var md5blks = [];
+        for (var i = 0; i < 64; i += 4) {
+            md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
+        }
+        return md5blks;
+    }
+
+    var hex_chr = '0123456789abcdef'.split('');
+
+    function rhex(n) {
+        var s = '', j = 0;
+        for (; j < 4; j++)
+            s += hex_chr[(n >> (j * 8 + 4)) & 0x0F] + hex_chr[(n >> (j * 8)) & 0x0F];
+        return s;
+    }
+
+    function hex(x) {
+        for (var i = 0; i < x.length; i++)
+            x[i] = rhex(x[i]);
+        return x.join('');
+    }
+
+    function add32(a, b) {
+        return (a + b) & 0xFFFFFFFF;
+    }
+
+    return hex(md51(input));
+}
+
+// 双重MD5加密函数（32位大写）
+function doubleMd5(password) {
+    // 第一次MD5加密
+    const firstMd5 = md5(password);
+    // 第二次MD5加密并转换为大写
+    return md5(firstMd5).toUpperCase();
+}
 
 // 显示工号输入弹窗
 function showEmployeeIdInput() {
@@ -208,6 +364,12 @@ window.onclick = function(event) {
     if (logsModal && event.target === logsModal) {
         logsModal.style.display = 'none';
     }
+    
+    // 今日进展日志弹窗
+    const todayProgressModal = document.getElementById('todayProgressModal');
+    if (todayProgressModal && event.target === todayProgressModal) {
+        todayProgressModal.style.display = 'none';
+    }
 }
 
 // 成员页面初始化
@@ -408,11 +570,55 @@ async function initAdminPage() {
     // 加载成员列表
     await loadMembers();
     
+    // 加载项目编号
+    await loadProjectNumber();
+    
     // 设置默认日期
     const dataDateElement = document.getElementById('dataDate');
     if (dataDateElement) {
         dataDateElement.setAttribute('value', new Date().toISOString().split('T')[0]);
         console.log('Default date set:', new Date().toISOString().split('T')[0]);
+    }
+}
+
+// 保存项目编号
+async function saveProjectNumber() {
+    const projectNumber = document.getElementById('projectNumber').value.trim();
+    if (!projectNumber) {
+        alert('项目编号不能为空！');
+        return;
+    }
+    
+    try {
+        // 获取当前管理员设置
+        const adminSettings = await getFromLocalStorage('adminSettings', {});
+        
+        // 更新项目编号
+        adminSettings.projectNumber = {
+            data: projectNumber,
+            version: adminSettings.projectNumber ? adminSettings.projectNumber.version + 1 : 1
+        };
+        
+        // 保存更新后的管理员设置
+        await saveToLocalStorage('adminSettings', adminSettings);
+        alert('项目编号保存成功！');
+    } catch (error) {
+        console.error('保存项目编号失败:', error);
+        alert('保存失败，请重试！');
+    }
+}
+
+// 加载项目编号
+async function loadProjectNumber() {
+    try {
+        const adminSettings = await getFromLocalStorage('adminSettings', {});
+        const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+        const projectNumberInput = document.getElementById('projectNumber');
+        if (projectNumberInput) {
+            projectNumberInput.value = projectNumber;
+        }
+    } catch (error) {
+        console.error('加载项目编号失败:', error);
     }
 }
 
@@ -903,6 +1109,9 @@ async function saveReport() {
             
             // 显示成功消息
             showAlertModal('报告保存成功！');
+            
+            // 保存成功，显示"同步到数字神经"按钮
+            showSyncNerveButton();
             return; // 保存成功，退出函数
         } catch (error) {
             console.error('Error in saveReport:', error);
@@ -1019,23 +1228,29 @@ async function loadProjectsToDropdown(selectElement) {
     try {
         // 从localStorage获取项目数据，如果没有则使用默认数据
         const defaultProjects = ['数据集成平台', '数据治理平台', '数据分析', 'AI模型管理', '其他'];
-        const projects = await getFromLocalStorage('projects', defaultProjects);
+        let projects = await getFromLocalStorage('projects', defaultProjects);
+        
+        // 确保默认项目数据也适配新的数据结构
+        if (projects.length > 0 && typeof projects[0] === 'string') {
+            projects = projects.map(name => ({ name, milestoneNumber: '', milestoneName: '' }));
+        }
         
         // 添加项目选项
         projects.forEach(project => {
             const option = document.createElement('option');
-            option.value = project;
-            option.textContent = project;
+            option.value = project.name;
+            option.textContent = project.name;
             selectElement.appendChild(option);
         });
     } catch (error) {
         console.error('加载项目数据失败:', error);
         // 如果加载失败，使用默认项目
         const defaultProjects = ['数据集成平台', '数据治理平台', '数据分析', 'AI模型管理', '其他'];
-        defaultProjects.forEach(project => {
+        const formattedProjects = defaultProjects.map(name => ({ name, milestoneNumber: '', milestoneName: '' }));
+        formattedProjects.forEach(project => {
             const option = document.createElement('option');
-            option.value = project;
-            option.textContent = project;
+            option.value = project.name;
+            option.textContent = project.name;
             selectElement.appendChild(option);
         });
     }
@@ -1637,12 +1852,16 @@ async function loadMemberReport() {
             }
             
             console.log('\n=== 报告数据加载完成 ===');
+            // 已找到当天报告，显示"同步到数字神经"按钮
+            showSyncNerveButton();
         } else {
             console.log('\n=== 未找到当天报告数据 ===');
             // 没有找到报告，清空表单（除了姓名）
             clearFormExceptName();
             // 注意：这里不清空reportId，让保存时自动生成新ID
             console.log('已清空表单内容（除了姓名）');
+            // 未找到当天报告，隐藏"同步到数字神经"按钮
+            hideSyncNerveButton();
         }
     } catch (error) {
         console.error('加载报告数据失败:', error);
@@ -1916,9 +2135,10 @@ async function renderLogs() {
     };
     
     // 渲染日志条目
-    currentLogs.forEach(log => {
-        const logItem = document.createElement('div');
-        logItem.className = 'log-item';
+        currentLogs.forEach(log => {
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.setAttribute('data-log-id', log.id);
         
         // 辅助函数：根据进度获取显示文本
         const getProgressText = (progress) => {
@@ -1971,8 +2191,16 @@ async function renderLogs() {
                 <span class="log-date">${log.date}</span>
                 <span class="log-member">${log.memberName}</span>
                 <span class="log-type log-type-${log.type}">${log.type === 'daily' ? '日报' : '周报'}</span>
+                <button class="btn btn-edit-log" onclick="toggleLogEdit(${log.id})">编辑</button>
             </div>
-            ${logContent}
+            <div class="log-content-view">
+                ${logContent}
+            </div>
+            <div class="log-content-edit" style="display: none;"></div>
+            <div class="log-actions-edit" style="display: none;">
+                <button class="btn btn-save-edit" onclick="saveLogEdit(${log.id})">保存</button>
+                <button class="btn btn-cancel-edit" onclick="cancelLogEdit(${log.id})">取消</button>
+            </div>
         `;
         
         logsList.appendChild(logItem);
@@ -2676,6 +2904,663 @@ async function deleteReport(reportId, event) {
     }
 }
 
+// 显示"同步到数字神经"按钮
+function showSyncNerveButton() {
+    const syncButton = document.querySelector('.btn-sync-nerve');
+    if (syncButton) {
+        syncButton.style.display = 'inline-block';
+    }
+}
+
+
+
+// 同步到数字神经
+async function syncToNerve() {
+    try {
+        // 1. 获取当天报告数据
+        const currentMemberStr = sessionStorage.getItem('currentMember');
+        const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
+        const today = new Date().toISOString().split('T')[0];
+        const currentReportType = document.getElementById('reportType').value;
+        const reports = await getFromLocalStorage('reports', []);
+        
+        const todayReport = reports.find(report => {
+            const isSameMember = (report.employeeId && currentMember?.employeeId && report.employeeId === currentMember.employeeId) ||
+                                (report.memberName && currentMember?.name && report.memberName === currentMember.name);
+            const isSameDate = report.date === today;
+            const isSameType = report.type === currentReportType;
+            return isSameMember && isSameDate && isSameType;
+        });
+
+        if (!todayReport) {
+            alert('未找到当天的报告数据，无法同步');
+            return;
+        }
+
+        // 2. 检查是否有已保存的Cookie
+        let cookie = localStorage.getItem('nerveCookie');
+        let loginSuccess = false;
+        let password = null;
+
+        // 3. 如果有Cookie，尝试使用它进行同步
+        if (cookie) {
+            try {
+                // 这里可以添加一个验证Cookie是否有效的逻辑
+                // 例如，尝试调用一个需要Cookie的API来验证
+                // 为了简化，我们先假设Cookie是有效的
+                loginSuccess = true;
+                console.log('使用已保存的Cookie进行同步');
+            } catch (error) {
+                console.error('使用已保存的Cookie同步失败:', error);
+                // Cookie无效，清除缓存
+                localStorage.removeItem('nerveCookie');
+                cookie = null;
+            }
+        }
+
+        // 4. 如果没有Cookie或Cookie无效，需要登录获取新的Cookie
+        if (!loginSuccess) {
+            // 检查是否有缓存的密码
+            password = localStorage.getItem('nervePassword');
+
+            // 先尝试使用缓存密码登录
+            if (password) {
+                try {
+                    cookie = await loginToNerve(password);
+                    loginSuccess = true;
+                    console.log('使用缓存密码登录成功');
+                } catch (error) {
+                    console.error('使用缓存密码登录失败:', error);
+                    // 缓存密码无效，清除缓存
+                    localStorage.removeItem('nervePassword');
+                    password = null;
+                }
+            }
+
+            // 如果没有缓存密码或登录失败，显示弹窗让用户输入
+            if (!loginSuccess) {
+                // 显示自定义登录弹窗
+                openNerveLoginModal();
+                
+                // 等待用户输入密码（通过Promise实现异步等待）
+                password = await new Promise((resolve, reject) => {
+                    // 存储回调函数
+                    window.nerveLoginResolve = resolve;
+                    window.nerveLoginReject = reject;
+                });
+
+                // 验证密码
+                try {
+                    cookie = await loginToNerve(password);
+                    loginSuccess = true;
+                    // 密码验证成功，缓存密码
+                    localStorage.setItem('nervePassword', password);
+                    console.log('用户输入密码登录成功');
+                } catch (error) {
+                    console.error('数字神经登录失败:', error);
+                    // 显示错误信息
+                    const errorElement = document.getElementById('nervePasswordError');
+                    if (errorElement) {
+                        errorElement.textContent = '密码错误，请重新输入';
+                    }
+                    // 清除密码输入框
+                    const passwordInput = document.getElementById('nervePassword');
+                    if (passwordInput) {
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                    // 递归调用，让用户重新输入
+                    return syncToNerve();
+                }
+            }
+        }
+
+        // 5. 使用获取的cookie进行同步操作
+        if (cookie) {
+            const syncData = {
+                employeeId: currentMember?.employeeId || todayReport.employeeId,
+                memberName: currentMember?.name || todayReport.memberName,
+                date: todayReport.date,
+                reportType: todayReport.type,
+                content: todayReport,
+                syncTime: new Date().toISOString()
+            };
+            console.log('同步到数字神经的数据:', syncData);
+            console.log('使用的Cookie:', cookie);
+            
+            // 显示今日进展日志弹窗
+            openTodayProgressModal(todayReport.todayProgress);
+        }
+    } catch (error) {
+        console.error('同步到数字神经失败:', error);
+        alert('同步到数字神经失败：' + error.message);
+    }
+}
+
+// 显示今日进展日志弹窗
+async function openTodayProgressModal(todayProgress) {
+    const modal = document.getElementById('todayProgressModal');
+    const contentDiv = document.getElementById('todayProgressContent');
+    
+    // 从localStorage获取所有项目数据和管理员设置
+    const projects = await getFromLocalStorage('projects', []);
+    const adminSettings = await getFromLocalStorage('adminSettings', {});
+    
+    // 获取项目编号
+    const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+    
+    // 构建今日进展内容的HTML表格（可编辑版本）
+    let contentHTML = `
+        <div class="progress-table-container">
+            <div class="table-actions">
+                <button id="saveProgressBtn" class="btn btn-primary">保存</button>
+                <button id="addProgressBtn" class="btn btn-secondary">添加</button>
+            </div>
+            <table class="progress-table">
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>项目编号</th>
+                        <th>项目名称</th>
+                        <th>里程碑</th>
+                        <th>里程碑名称</th>
+                        <th>工作内容</th>
+                        <th>工作量(小时)</th>
+                        <th>工作类型</th>
+                        <th>工作结果</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="progressTableBody">
+    `;
+    
+    if (todayProgress && todayProgress.length > 0) {
+        todayProgress.forEach((progress, index) => {
+            // 根据项目名称查找对应的项目对象
+            const project = projects.find(p => p.name === progress.project);
+            
+            // 获取项目编号、里程碑和里程碑名称
+            const projectCode = project ? project.milestoneNumber : '-';
+            const projectName = progress.project || '-';
+            const milestone = progress.milestone || '里程碑';
+            const milestoneName = project ? project.milestoneName : '-';
+            
+            contentHTML += `
+                <tr data-index="${index}">
+                    <td class="editable-cell" contenteditable="true">${index + 1}</td>
+                    <td class="editable-cell" contenteditable="true">${projectCode}</td>
+                    <td class="editable-cell" contenteditable="true">${projectName}</td>
+                    <td class="editable-cell" contenteditable="true">${projectNumber}</td>
+                    <td class="editable-cell" contenteditable="true">${milestoneName}</td>
+                    <td class="editable-cell" contenteditable="true">${progress.content || ''}</td>
+                    <td class="editable-cell" contenteditable="true">${progress.workHours || '8.0'}</td>
+                    <td>
+                        <select class="editable-select">
+                            <option value="软件开发" ${progress.workType === '软件开发' ? 'selected' : ''}>软件开发</option>
+                            <option value="测试" ${progress.workType === '测试' ? 'selected' : ''}>测试</option>
+                            <option value="文档编写" ${progress.workType === '文档编写' ? 'selected' : ''}>文档编写</option>
+                            <option value="会议" ${progress.workType === '会议' ? 'selected' : ''}>会议</option>
+                            <option value="其他" ${progress.workType === '其他' ? 'selected' : ''}>其他</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select class="editable-select">
+                            <option value="进行中" ${progress.workResult === '进行中' ? 'selected' : ''}>进行中</option>
+                            <option value="已完成" ${progress.workResult === '已完成' ? 'selected' : ''}>已完成</option>
+                            <option value="暂停" ${progress.workResult === '暂停' ? 'selected' : ''}>暂停</option>
+                            <option value="待开始" ${progress.workResult === '待开始' ? 'selected' : ''}>待开始</option>
+                        </select>
+                    </td>
+                    <td class="editable-cell" contenteditable="true">${progress.remarks || ''}</td>
+                    <td>
+                        <button class="action-btn btn-delete" onclick="deleteProgressRow(${index})">删除</button>
+                    </td>
+                </tr>
+            `;
+        });
+    } else {
+        contentHTML += `
+            <tr>
+                <td colspan="11" class="no-data">今日暂无进展记录</td>
+            </tr>
+        `;
+    }
+    
+    contentHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    contentDiv.innerHTML = contentHTML;
+    
+    // 添加事件监听
+    document.getElementById('saveProgressBtn').addEventListener('click', saveProgressChanges);
+    document.getElementById('addProgressBtn').addEventListener('click', addProgressRow);
+    
+    // 显示弹窗
+    modal.style.display = 'block';
+}
+
+// 删除进度行
+function deleteProgressRow(index) {
+    const row = document.querySelector(`tr[data-index="${index}"]`);
+    if (row) {
+        row.remove();
+        // 重新编号
+        updateRowNumbers();
+    }
+}
+
+// 添加新进度行
+function addProgressRow() {
+    const tableBody = document.getElementById('progressTableBody');
+    const newIndex = tableBody.rows.length;
+    
+    // 获取项目编号
+    const adminSettings = JSON.parse(localStorage.getItem('adminSettings') || '{}');
+    const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+    
+    const newRowHTML = `
+        <tr data-index="${newIndex}">
+            <td class="editable-cell" contenteditable="true">${newIndex + 1}</td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td class="editable-cell" contenteditable="true">${projectNumber}</td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td class="editable-cell" contenteditable="true">8.0</td>
+            <td>
+                <select class="editable-select">
+                    <option value="软件开发">软件开发</option>
+                    <option value="测试">测试</option>
+                    <option value="文档编写">文档编写</option>
+                    <option value="会议">会议</option>
+                    <option value="其他">其他</option>
+                </select>
+            </td>
+            <td>
+                <select class="editable-select">
+                    <option value="进行中" selected>进行中</option>
+                    <option value="已完成">已完成</option>
+                    <option value="暂停">暂停</option>
+                    <option value="待开始">待开始</option>
+                </select>
+            </td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td>
+                <button class="action-btn btn-delete" onclick="deleteProgressRow(${newIndex})">删除</button>
+            </td>
+        </tr>
+    `;
+    
+    tableBody.insertAdjacentHTML('beforeend', newRowHTML);
+}
+
+// 更新行号
+function updateRowNumbers() {
+    const rows = document.querySelectorAll('#progressTableBody tr:not(.no-data)');
+    rows.forEach((row, index) => {
+        const numberCell = row.querySelector('td:nth-child(1)');
+        if (numberCell) {
+            numberCell.textContent = index + 1;
+        }
+        row.setAttribute('data-index', index);
+        const deleteBtn = row.querySelector('.btn-delete');
+        if (deleteBtn) {
+            deleteBtn.setAttribute('onclick', `deleteProgressRow(${index})`);
+        }
+    });
+}
+
+// 保存进度变更
+async function saveProgressChanges() {
+    const rows = document.querySelectorAll('#progressTableBody tr:not(.no-data)');
+    const updatedProgress = [];
+    
+    // 获取所有项目数据
+    const projects = await getFromLocalStorage('projects', []);
+    
+    rows.forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+        const projectName = cells[2].textContent;
+        
+        // 根据项目名称查找对应的项目对象
+        const project = projects.find(p => p.name === projectName);
+        
+        const progressItem = {
+            id: index,
+            serialNumber: cells[0].textContent,
+            projectCode: project ? project.milestoneNumber : cells[1].textContent,
+            projectName: projectName,
+            milestone: cells[3].textContent,
+            milestoneName: project ? project.milestoneName : cells[4].textContent,
+            workContent: cells[5].textContent,
+            workHours: parseFloat(cells[6].textContent) || 0,
+            workType: cells[7].querySelector('select').value,
+            workResult: cells[8].querySelector('select').value,
+            remarks: cells[9].textContent
+        };
+        updatedProgress.push(progressItem);
+    });
+    
+    // 这里可以添加保存到后端或本地的逻辑
+    console.log('保存的进度数据:', updatedProgress);
+    alert('保存成功！');
+}
+
+// 关闭今日进展日志弹窗
+function closeTodayProgressModal() {
+    document.getElementById('todayProgressModal').style.display = 'none';
+}
+
+// 切换日志编辑模式
+function toggleLogEdit(logId) {
+    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
+    if (!logItem) return;
+    
+    const viewContent = logItem.querySelector('.log-content-view');
+    const editContent = logItem.querySelector('.log-content-edit');
+    const editActions = logItem.querySelector('.log-actions-edit');
+    
+    // 获取当前日志数据
+    const log = allLogs.find(l => l.id === logId);
+    if (!log) return;
+    
+    // 如果是查看模式，切换到编辑模式
+    if (viewContent.style.display !== 'none') {
+        // 构建编辑模式的表单
+        buildLogEditForm(editContent, log);
+        
+        // 切换显示状态
+        viewContent.style.display = 'none';
+        editContent.style.display = 'block';
+        editActions.style.display = 'block';
+    } else {
+        // 切换回查看模式
+        viewContent.style.display = 'block';
+        editContent.style.display = 'none';
+        editActions.style.display = 'none';
+    }
+}
+
+// 构建日志编辑表单
+function buildLogEditForm(container, log) {
+    // 获取所有项目数据
+    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+    const projectOptions = projects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+    
+    let formHTML = '';
+    
+    if (log.type === 'daily') {
+        // 构建日报编辑表单
+        formHTML = `
+            <h3>今日进展</h3>
+            <div id="edit-today-progress-${log.id}" class="content-group">
+                ${log.todayProgress.map((item, index) => buildEditWorkItem(item, index, 'todayProgress')).join('')}
+            </div>
+            <button type="button" onclick="addEditWorkItem(${log.id}, 'todayProgress')" class="btn btn-add">+ 添加今日进展</button>
+            
+            <h3>明日计划</h3>
+            <div id="edit-tomorrow-plan-${log.id}" class="content-group">
+                ${log.tomorrowPlan.map((item, index) => buildEditWorkItem(item, index, 'tomorrowPlan')).join('')}
+            </div>
+            <button type="button" onclick="addEditWorkItem(${log.id}, 'tomorrowPlan')" class="btn btn-add">+ 添加明日计划</button>
+        `;
+    } else {
+        // 构建周报编辑表单
+        formHTML = `
+            <h3>本周完成工作</h3>
+            <div id="edit-weekly-done-${log.id}" class="content-group">
+                ${log.weeklyDone.map((item, index) => buildEditWorkItem(item, index, 'weeklyDone')).join('')}
+            </div>
+            <button type="button" onclick="addEditWorkItem(${log.id}, 'weeklyDone')" class="btn btn-add">+ 添加本周完成</button>
+            
+            <h3>下周工作计划</h3>
+            <div id="edit-weekly-plan-${log.id}" class="content-group">
+                ${log.weeklyPlan.map((item, index) => buildEditWorkItem(item, index, 'weeklyPlan')).join('')}
+            </div>
+            <button type="button" onclick="addEditWorkItem(${log.id}, 'weeklyPlan')" class="btn btn-add">+ 添加下周计划</button>
+        `;
+    }
+    
+    container.innerHTML = formHTML;
+}
+
+// 构建单个工作项的编辑表单
+function buildEditWorkItem(item, index, type) {
+    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
+    const projectOptions = projects.map(p => `<option value="${p}" ${item.project === p ? 'selected' : ''}>${p}</option>`).join('');
+    
+    return `
+        <div class="content-item">
+            <select class="log-project" required>
+                <option value="">请选择项目</option>
+                ${projectOptions}
+            </select>
+            <input type="text" class="log-content" placeholder="工作内容" value="${item.content || ''}" required>
+            ${type.includes('Plan') ? '' : `<div class="progress-container">
+                <input type="number" class="log-progress" placeholder="进度" min="1" max="100" value="${item.progress || ''}" required>
+                <span class="progress-percent">%</span>
+            </div>`}
+            <button type="button" onclick="removeEditWorkItem(this)" class="btn-remove">×</button>
+        </div>
+    `;
+}
+
+// 添加编辑模式下的工作项
+function addEditWorkItem(logId, type) {
+    const container = document.getElementById(`edit-${type.toLowerCase().replace(/\s/g, '-')}-${logId}`);
+    const newIndex = container.children.length;
+    container.appendChild(buildEditWorkItem({}, newIndex, type));
+}
+
+// 移除编辑模式下的工作项
+function removeEditWorkItem(btn) {
+    btn.parentElement.remove();
+}
+
+// 保存日志编辑
+function saveLogEdit(logId) {
+    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
+    const editContent = logItem.querySelector('.log-content-edit');
+    
+    // 获取当前日志数据
+    const logIndex = allLogs.findIndex(l => l.id === logId);
+    if (logIndex === -1) return;
+    
+    const log = allLogs[logIndex];
+    const updatedLog = { ...log };
+    
+    // 根据日志类型获取编辑内容
+    if (log.type === 'daily') {
+        updatedLog.todayProgress = getWorkItemsFromEdit(editContent, 'todayProgress');
+        updatedLog.tomorrowPlan = getWorkItemsFromEdit(editContent, 'tomorrowPlan');
+    } else {
+        updatedLog.weeklyDone = getWorkItemsFromEdit(editContent, 'weeklyDone');
+        updatedLog.weeklyPlan = getWorkItemsFromEdit(editContent, 'weeklyPlan');
+    }
+    
+    // 更新日志数据
+    allLogs[logIndex] = updatedLog;
+    localStorage.setItem('reports', JSON.stringify(allLogs));
+    
+    // 重新渲染日志列表
+    renderLogs();
+    
+    alert('日志保存成功！');
+}
+
+// 从编辑表单中获取工作项数据
+function getWorkItemsFromEdit(container, type) {
+    const items = [];
+    const contentGroup = container.querySelector(`[id^="edit-${type.toLowerCase().replace(/\s/g, '-')}-"]`);
+    const contentItems = contentGroup.querySelectorAll('.content-item');
+    
+    contentItems.forEach(item => {
+        const project = item.querySelector('.log-project').value;
+        const content = item.querySelector('.log-content').value;
+        const progress = item.querySelector('.log-progress') ? parseInt(item.querySelector('.log-progress').value) : null;
+        
+        items.push({ project, content, progress });
+    });
+    
+    return items;
+}
+
+// 取消日志编辑
+function cancelLogEdit(logId) {
+    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
+    if (!logItem) return;
+    
+    const viewContent = logItem.querySelector('.log-content-view');
+    const editContent = logItem.querySelector('.log-content-edit');
+    const editActions = logItem.querySelector('.log-actions-edit');
+    
+    // 切换回查看模式
+    viewContent.style.display = 'block';
+    editContent.style.display = 'none';
+    editActions.style.display = 'none';
+}
+
+// 登录数字神经API
+async function loginToNerve(password) {
+    try {
+        // 获取当前登录的成员信息
+        const currentMemberStr = sessionStorage.getItem('currentMember');
+        const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
+        
+        if (!currentMember || !currentMember.employeeId) {
+            throw new Error('未获取到员工工号信息');
+        }
+        
+        // 准备登录参数
+        const loginParams = {
+            loginName: currentMember.employeeId,
+            password: doubleMd5(password), // 使用双重MD5加密密码（32位大写）
+            rmbUser: 'on'
+        };
+        
+        // 创建URLSearchParams来发送表单数据
+        const searchParams = new URLSearchParams();
+        Object.entries(loginParams).forEach(([key, value]) => {
+            searchParams.append(key, value);
+        });
+
+        // 调用登录API
+        const response = await fetch('/api/nerve/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: searchParams.toString()
+        });
+
+        // 解析响应为JSON
+        const responseData = await response.json();
+
+        // 检查登录是否成功
+        if (!responseData.success) {
+            throw new Error(responseData.message || '登录失败');
+        }
+        
+        // 直接使用后端返回的cookie
+        if (!responseData.cookie) {
+            throw new Error('登录成功但未获取到Cookie');
+        }
+        
+        // 保存Cookie到localStorage
+        localStorage.setItem('nerveCookie', responseData.cookie);
+
+        return responseData.cookie;
+    } catch (error) {
+        console.error('数字神经登录API调用失败:', error);
+        throw new Error('登录失败：' + error.message);
+    }
+}
+
+
+
+// 打开数字神经登录弹窗
+function openNerveLoginModal() {
+    const modal = document.getElementById('nerveLoginModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+    
+    // 清除错误信息
+    const errorElement = document.getElementById('nervePasswordError');
+    if (errorElement) {
+        errorElement.textContent = '';
+    }
+    
+    // 清空密码输入框并聚焦
+    const passwordInput = document.getElementById('nervePassword');
+    if (passwordInput) {
+        passwordInput.value = '';
+        passwordInput.focus();
+    }
+}
+
+// 关闭数字神经登录弹窗
+function closeNerveLoginModal() {
+    const modal = document.getElementById('nerveLoginModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
+    // 拒绝Promise，取消登录
+    if (window.nerveLoginReject) {
+        window.nerveLoginReject(new Error('用户取消登录'));
+        // 清理回调函数
+        delete window.nerveLoginResolve;
+        delete window.nerveLoginReject;
+    }
+}
+
+// 提交数字神经登录
+function submitNerveLogin() {
+    const passwordInput = document.getElementById('nervePassword');
+    if (passwordInput) {
+        const password = passwordInput.value.trim();
+        
+        if (!password) {
+            // 显示错误信息
+            const errorElement = document.getElementById('nervePasswordError');
+            if (errorElement) {
+                errorElement.textContent = '请输入密码';
+            }
+            passwordInput.focus();
+            return;
+        }
+        
+        // 解决Promise，返回密码
+        if (window.nerveLoginResolve) {
+            window.nerveLoginResolve(password);
+            // 清理回调函数
+            delete window.nerveLoginResolve;
+            delete window.nerveLoginReject;
+        }
+        
+        // 关闭弹窗
+        const modal = document.getElementById('nerveLoginModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+}
+
+// 隐藏"同步到数字神经"按钮
+function hideSyncNerveButton() {
+    const syncButton = document.querySelector('.btn-sync-nerve');
+    if (syncButton) {
+        syncButton.style.display = 'none';
+    }
+}
+
+
+
 // 显示报告详情弹窗
 async function showReportDetail(report) {
     const modal = document.getElementById('reportDetailModal');
@@ -2788,7 +3673,7 @@ async function loadSettings() {
 
 // 加载项目列表
 async function loadProjects() {
-    const projects = await getFromLocalStorage('projects', ['项目A', '项目B', '项目C']);
+    const projects = await getFromLocalStorage('projects', []);
     
     // 成员页面的项目选择器
     const projectSelect = document.getElementById('project');
@@ -2796,8 +3681,8 @@ async function loadProjects() {
         projectSelect.innerHTML = '<option value="">请选择项目</option>';
         projects.forEach(project => {
             const option = document.createElement('option');
-            option.value = project;
-            option.textContent = project;
+            option.value = project.name;
+            option.textContent = project.name;
             projectSelect.appendChild(option);
         });
     }
@@ -2809,9 +3694,24 @@ async function loadProjects() {
         projects.forEach(project => {
             const projectItem = document.createElement('div');
             projectItem.className = 'project-item';
+            projectItem.setAttribute('data-project-name', project.name);
             projectItem.innerHTML = `
-                <span>${project}</span>
-                <button onclick="removeProject('${project}')" class="btn btn-remove">×</button>
+                <div class="project-info">
+                    <span class="project-name">${project.name}</span>
+                    <span class="project-milestone">里程碑编号: ${project.milestoneNumber}</span>
+                    <span class="project-milestone">里程碑名称: ${project.milestoneName}</span>
+                </div>
+                <div class="project-actions">
+                    <button onclick="editProject('${project.name}')" class="btn btn-edit">编辑</button>
+                    <button onclick="removeProject('${project.name}')" class="btn btn-remove">×</button>
+                </div>
+                <div class="project-edit-form" style="display: none;">
+                    <input type="text" class="edit-project-name" value="${project.name}" placeholder="项目名称">
+                    <input type="text" class="edit-milestone-number" value="${project.milestoneNumber}" placeholder="里程碑编号">
+                    <input type="text" class="edit-milestone-name" value="${project.milestoneName}" placeholder="里程碑名称">
+                    <button onclick="saveProjectEdit('${project.name}')" class="btn btn-save">保存</button>
+                    <button onclick="cancelProjectEdit('${project.name}')" class="btn btn-cancel">取消</button>
+                </div>
             `;
             projectsList.appendChild(projectItem);
         });
@@ -2829,25 +3729,126 @@ async function loadMembers() {
         members.forEach(member => {
             const memberItem = document.createElement('div');
             memberItem.className = 'member-item';
+            memberItem.setAttribute('data-employee-id', member.employeeId);
             memberItem.innerHTML = `
                 <div class="member-info">
                     <span class="member-name">${member.name}</span>
                     <span class="member-employee-id">${member.employeeId}</span>
                 </div>
-                <button onclick="removeMember('${member.employeeId}')" class="btn btn-remove">×</button>
+                <div class="member-actions">
+                    <button onclick="editMember('${member.employeeId}')" class="btn btn-edit">编辑</button>
+                    <button onclick="removeMember('${member.employeeId}')" class="btn btn-remove">×</button>
+                </div>
+                <div class="member-edit-form" style="display: none;">
+                    <input type="text" class="edit-name" value="${member.name}" placeholder="姓名">
+                    <input type="text" class="edit-employee-id" value="${member.employeeId}" placeholder="员工工号" readonly>
+                    <button onclick="saveMemberEdit('${member.employeeId}')" class="btn btn-save">保存</button>
+                    <button onclick="cancelMemberEdit('${member.employeeId}')" class="btn btn-cancel">取消</button>
+                </div>
             `;
             membersList.appendChild(memberItem);
         });
     }
 }
 
+// 编辑成员
+function editMember(employeeId) {
+    const memberItem = document.querySelector(`[data-employee-id="${employeeId}"]`);
+    if (!memberItem) return;
+    
+    const memberInfo = memberItem.querySelector('.member-info');
+    const memberActions = memberItem.querySelector('.member-actions');
+    const memberEditForm = memberItem.querySelector('.member-edit-form');
+    
+    memberInfo.style.display = 'none';
+    memberActions.style.display = 'none';
+    memberEditForm.style.display = 'block';
+}
+
+// 保存成员编辑
+async function saveMemberEdit(employeeId) {
+    const memberItem = document.querySelector(`[data-employee-id="${employeeId}"]`);
+    if (!memberItem) return;
+    
+    const editName = memberItem.querySelector('.edit-name').value.trim();
+    
+    if (!editName) {
+        alert('姓名不能为空！');
+        return;
+    }
+    
+    let retryAttempts = 0;
+    const maxRetries = 3;
+    
+    while (retryAttempts < maxRetries) {
+        try {
+            const members = await getFromLocalStorage('members', []);
+            const memberIndex = members.findIndex(m => m.employeeId === employeeId);
+            
+            if (memberIndex === -1) {
+                alert('未找到该成员！');
+                return;
+            }
+            
+            members[memberIndex].name = editName;
+            await saveToLocalStorage('members', members);
+            
+            // 重新加载成员列表
+            await loadMembers();
+            return;
+        } catch (error) {
+            console.error('保存成员信息失败:', error);
+            
+            if (error.message && error.message.includes('Version conflict')) {
+                retryAttempts++;
+                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+                alert('保存失败: ' + error.message);
+                return;
+            }
+        }
+    }
+    
+    alert('保存失败: 数据已被其他人修改，请刷新页面后重试');
+}
+
+// 取消成员编辑
+function cancelMemberEdit(employeeId) {
+    const memberItem = document.querySelector(`[data-employee-id="${employeeId}"]`);
+    if (!memberItem) return;
+    
+    const memberInfo = memberItem.querySelector('.member-info');
+    const memberActions = memberItem.querySelector('.member-actions');
+    const memberEditForm = memberItem.querySelector('.member-edit-form');
+    
+    memberInfo.style.display = 'block';
+    memberActions.style.display = 'flex';
+    memberEditForm.style.display = 'none';
+}
+
 // 添加项目
 async function addProject() {
     const newProjectInput = document.getElementById('newProject');
+    const newMilestoneNumberInput = document.getElementById('newMilestoneNumber');
+    const newMilestoneNameInput = document.getElementById('newMilestoneName');
+    
     const projectName = newProjectInput.value.trim();
+    const milestoneNumber = newMilestoneNumberInput.value.trim();
+    const milestoneName = newMilestoneNameInput.value.trim();
     
     if (!projectName) {
         alert('请输入项目名称！');
+        return;
+    }
+    
+    if (!milestoneNumber) {
+        alert('请输入里程碑编号！');
+        return;
+    }
+    
+    if (!milestoneName) {
+        alert('请输入里程碑名称！');
         return;
     }
     
@@ -2858,12 +3859,20 @@ async function addProject() {
         try {
             const projects = await getFromLocalStorage('projects', []);
             
-            if (projects.includes(projectName)) {
+            // 检查项目名称是否已存在
+            if (projects.some(project => project.name === projectName)) {
                 alert('该项目已存在！');
                 return;
             }
             
-            projects.push(projectName);
+            // 创建新的项目对象
+            const newProject = {
+                name: projectName,
+                milestoneNumber: milestoneNumber,
+                milestoneName: milestoneName
+            };
+            
+            projects.push(newProject);
             await saveToLocalStorage('projects', projects);
             
             // 重新加载项目列表
@@ -2871,6 +3880,8 @@ async function addProject() {
             
             // 清空输入框
             newProjectInput.value = '';
+            newMilestoneNumberInput.value = '';
+            newMilestoneNameInput.value = '';
             return; // 添加成功，退出函数
         } catch (error) {
             console.error('添加项目失败:', error);
@@ -2897,6 +3908,122 @@ async function addProject() {
     alert('添加失败: 数据已被其他人修改，请刷新页面后重试');
 }
 
+// 编辑项目
+function editProject(projectName) {
+    const projectItem = document.querySelector(`[data-project-name="${projectName}"]`);
+    if (!projectItem) return;
+    
+    const projectInfo = projectItem.querySelector('.project-info');
+    const projectActions = projectItem.querySelector('.project-actions');
+    const projectEditForm = projectItem.querySelector('.project-edit-form');
+    
+    projectInfo.style.display = 'none';
+    projectActions.style.display = 'none';
+    projectEditForm.style.display = 'block';
+    
+    // 聚焦到输入框
+    const editInput = projectItem.querySelector('.edit-project-name');
+    if (editInput) {
+        editInput.focus();
+        editInput.select();
+    }
+}
+
+// 保存项目编辑
+async function saveProjectEdit(originalProjectName) {
+    const projectItem = document.querySelector(`[data-project-name="${originalProjectName}"]`);
+    if (!projectItem) return;
+    
+    const newProjectName = projectItem.querySelector('.edit-project-name').value.trim();
+    const newMilestoneNumber = projectItem.querySelector('.edit-milestone-number').value.trim();
+    const newMilestoneName = projectItem.querySelector('.edit-milestone-name').value.trim();
+    
+    if (!newProjectName) {
+        alert('项目名称不能为空！');
+        return;
+    }
+    
+    if (!newMilestoneNumber) {
+        alert('里程碑编号不能为空！');
+        return;
+    }
+    
+    if (!newMilestoneName) {
+        alert('里程碑名称不能为空！');
+        return;
+    }
+    
+    if (newProjectName === originalProjectName && newMilestoneNumber === projectItem.querySelector('.project-milestone').textContent.replace('里程碑编号: ', '') && newMilestoneName === projectItem.querySelector('.project-milestone + .project-milestone').textContent.replace('里程碑名称: ', '')) {
+        cancelProjectEdit(originalProjectName);
+        return;
+    }
+    
+    let retryAttempts = 0;
+    const maxRetries = 3;
+    
+    while (retryAttempts < maxRetries) {
+        try {
+            const projects = await getFromLocalStorage('projects', []);
+            
+            // 检查项目名称是否已存在（排除当前编辑的项目）
+            if (projects.some(project => project.name === newProjectName && project.name !== originalProjectName)) {
+                alert('该项目名称已存在！');
+                return;
+            }
+            
+            const projectIndex = projects.findIndex(project => project.name === originalProjectName);
+            if (projectIndex === -1) {
+                alert('未找到该项目！');
+                return;
+            }
+            
+            // 更新项目信息
+            projects[projectIndex] = {
+                name: newProjectName,
+                milestoneNumber: newMilestoneNumber,
+                milestoneName: newMilestoneName
+            };
+            await saveToLocalStorage('projects', projects);
+            
+            // 重新加载项目列表
+            await loadProjects();
+            return;
+        } catch (error) {
+            console.error('保存项目信息失败:', error);
+            
+            if (error.message && error.message.includes('Version conflict')) {
+                retryAttempts++;
+                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                
+                // 清除本地版本缓存，强制重新获取最新数据
+                delete dataVersions['projects'];
+                
+                // 短暂延迟后重试
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+                alert('保存失败: ' + error.message);
+                return;
+            }
+        }
+    }
+    
+    alert('保存失败: 数据已被其他人修改，请刷新页面后重试');
+}
+
+// 取消项目编辑
+function cancelProjectEdit(projectName) {
+    const projectItem = document.querySelector(`[data-project-name="${projectName}"]`);
+    if (!projectItem) return;
+    
+    const projectInfo = projectItem.querySelector('.project-info');
+    const projectActions = projectItem.querySelector('.project-actions');
+    const projectEditForm = projectItem.querySelector('.project-edit-form');
+    
+    projectInfo.style.display = 'block';
+    projectActions.style.display = 'flex';
+    projectEditForm.style.display = 'none';
+}
+
 // 删除项目
 async function removeProject(projectName) {
     if (confirm(`确定要删除项目 "${projectName}" 吗？`)) {
@@ -2906,7 +4033,7 @@ async function removeProject(projectName) {
         while (retryAttempts < maxRetries) {
             try {
                 let projects = await getFromLocalStorage('projects', []);
-                projects = projects.filter(project => project !== projectName);
+                projects = projects.filter(project => project.name !== projectName);
                 await saveToLocalStorage('projects', projects);
                 
                 // 重新加载项目列表

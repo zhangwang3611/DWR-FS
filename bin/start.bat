@@ -20,7 +20,7 @@ exit /b 1
 
 rem Check if port is already in use
 echo Checking if port %PORT% is available...
-netstat -ano | findstr :%PORT% >nul 2>nul
+netstat -ano | findstr "LISTENING" | findstr :%PORT% >nul 2>nul
 if %ERRORLEVEL% EQU 0 (
     echo Error: Port %PORT% is already in use
     echo Please stop the existing server or change the port in config/backend-config.js
