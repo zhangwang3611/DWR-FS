@@ -117,5 +117,14 @@
   "projectNumber": {
     "data": "RD202410",
     "version": 1
+  },
+  "adminSettings": {
+    "data": {
+      "projectNumber": {
+        "data": "RD202410",
+        "version": 1
+      }
+    },
+    "version": 1
   }
 }

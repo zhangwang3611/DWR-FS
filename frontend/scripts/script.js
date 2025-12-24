@@ -445,11 +445,39 @@ async function initMemberPage() {
     initLogs();
 }
 
+// 检查当天日报是否已填写
+async function hasTodayDailyReport() {
+    const currentMemberStr = sessionStorage.getItem('currentMember');
+    const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
+    if (!currentMember) return false;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const reports = await getFromLocalStorage('reports', []);
+    return reports.some(report => {
+        const sameMember = (report.employeeId && currentMember.employeeId && report.employeeId === currentMember.employeeId) ||
+                           (report.memberName && currentMember.name && report.memberName === currentMember.name);
+        return sameMember && report.date === today && report.type === 'daily';
+    });
+}
+
 // 切换日报/周报类型
-function toggleReportType() {
-    const reportType = document.getElementById('reportType').value;
+async function toggleReportType() {
+    const reportTypeSelect = document.getElementById('reportType');
+    const reportType = reportTypeSelect.value;
     const dailyContent = document.getElementById('dailyContent');
     const weeklyContent = document.getElementById('weeklyContent');
+    
+    if (reportType === 'weekly') {
+        const dailyDone = await hasTodayDailyReport();
+        if (!dailyDone) {
+            showAlertModal('请先填写当日的日报。');
+            // 恢复选择为日报
+            reportTypeSelect.value = 'daily';
+            if (dailyContent) dailyContent.style.display = 'block';
+            if (weeklyContent) weeklyContent.style.display = 'none';
+            return;
+        }
+    }
     
     if (reportType === 'daily') {
         dailyContent.style.display = 'block';
@@ -464,6 +492,82 @@ function toggleReportType() {
     
     // 切换报告类型后，重新加载对应类型的报告数据
     loadMemberReport();
+}
+
+// 统计日报弹窗
+function openDailyStatsModal() {
+    const modal = document.getElementById('dailyStatsModal');
+    if (!modal) return;
+    // 预填默认时间段：本周一到今天
+    const today = new Date();
+    const day = today.getDay() || 7; // 周一为1
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (day - 1));
+    const fmt = (d) => d.toISOString().split('T')[0];
+    const startInput = document.getElementById('dailyStatsStartDate');
+    const endInput = document.getElementById('dailyStatsEndDate');
+    if (startInput && !startInput.value) startInput.value = fmt(monday);
+    if (endInput && !endInput.value) endInput.value = fmt(today);
+    modal.style.display = 'block';
+}
+
+function closeDailyStatsModal() {
+    const modal = document.getElementById('dailyStatsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+// 将时间段内日报导入周报“本周完成”
+async function importDailyReportsToWeekly() {
+    const startInput = document.getElementById('dailyStatsStartDate');
+    const endInput = document.getElementById('dailyStatsEndDate');
+    if (!startInput || !endInput) return;
+    const startDate = startInput.value;
+    const endDate = endInput.value;
+    if (!startDate || !endDate) {
+        showAlertModal('请选择开始和结束日期');
+        return;
+    }
+    if (startDate > endDate) {
+        showAlertModal('开始日期不能大于结束日期');
+        return;
+    }
+    
+    const currentMemberStr = sessionStorage.getItem('currentMember');
+    const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
+    if (!currentMember) {
+        showAlertModal('未获取到成员信息，请重新登录');
+        return;
+    }
+    
+    const reports = await getFromLocalStorage('reports', []);
+    const inRangeDaily = reports.filter(r => {
+        const sameMember = (r.employeeId && currentMember.employeeId && r.employeeId === currentMember.employeeId) ||
+                          (r.memberName && currentMember.name && r.memberName === currentMember.name);
+        return sameMember && r.type === 'daily' && r.date >= startDate && r.date <= endDate;
+    });
+    
+    if (inRangeDaily.length === 0) {
+        showAlertModal('所选时间段内暂无日报');
+        return;
+    }
+    
+    // 汇总今日进展到周报本周完成
+    const weeklyDoneItems = [];
+    inRangeDaily.sort((a, b) => a.date.localeCompare(b.date));
+    inRangeDaily.forEach(report => {
+        (report.todayProgress || []).forEach(item => {
+            weeklyDoneItems.push({
+                project: item.project || '',
+                members: item.members || [],
+                content: item.content || '',
+                progress: item.progress
+            });
+        });
+    });
+    
+    await fillContentItems('weeklyDone', weeklyDoneItems);
+    closeDailyStatsModal();
+    showAlertModal('已将所选时间段内的日报导入本周完成');
 }
 
 // 初始化所有内容项的项目和成员下拉框
@@ -608,11 +712,39 @@ async function saveProjectNumber() {
     }
 }
 
-// 加载项目编号
-async function loadProjectNumber() {
+// 获取项目编号（优先adminSettings，缺失时回退读取静态配置）
+async function getProjectNumberValue() {
     try {
         const adminSettings = await getFromLocalStorage('adminSettings', {});
-        const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+        if (adminSettings.projectNumber && adminSettings.projectNumber.data) {
+            return adminSettings.projectNumber.data;
+        }
+        
+        // 回退读取静态配置文件
+        const resp = await fetch('/data/adminsetting.json');
+        if (resp.ok) {
+            const json = await resp.json();
+            const fallbackNumber = json.projectNumber ? json.projectNumber.data || '' : '';
+            if (fallbackNumber) {
+                // 写回到adminSettings，便于后续使用
+                adminSettings.projectNumber = {
+                    data: fallbackNumber,
+                    version: json.projectNumber && json.projectNumber.version ? json.projectNumber.version : 1
+                };
+                await saveToLocalStorage('adminSettings', adminSettings);
+            }
+            return fallbackNumber;
+        }
+    } catch (error) {
+        console.error('获取项目编号失败:', error);
+    }
+    return '';
+}
+
+// 加载项目编号到输入框
+async function loadProjectNumber() {
+    try {
+        const projectNumber = await getProjectNumberValue();
         const projectNumberInput = document.getElementById('projectNumber');
         if (projectNumberInput) {
             projectNumberInput.value = projectNumber;
@@ -1076,29 +1208,23 @@ async function saveReport() {
             // 获取现有报告（异步）
             const reports = await getFromLocalStorage('reports', []);
             
-            // 检查是否存在同一成员、同一天、同一类型的报告
-            const existingReportIndex = reports.findIndex(r => {
-                // 成员匹配：优先使用employeeId，其次使用memberName
-                const isSameMember = (r.employeeId && reportData.employeeId && r.employeeId === reportData.employeeId) ||
-                                    (r.memberName && reportData.memberName && r.memberName === reportData.memberName);
-                // 日期匹配
-                const isSameDate = r.date === reportData.date;
-                // 类型匹配
-                const isSameType = r.type === reportData.type;
-                
-                return isSameMember && isSameDate && isSameType;
-            });
+            // 合并/插入当前报告
+            const applyReport = (list, data) => {
+                const idx = list.findIndex(r => {
+                    const isSameMember = (r.employeeId && data.employeeId && r.employeeId === data.employeeId) ||
+                                         (r.memberName && data.memberName && r.memberName === data.memberName);
+                    return isSameMember && r.date === data.date && r.type === data.type;
+                });
+                if (idx !== -1) {
+                    data.id = list[idx].id;
+                    list[idx] = data;
+                } else {
+                    list.push(data);
+                }
+                return list;
+            };
             
-            if (existingReportIndex !== -1) {
-                // 更新现有报告，保留原有ID
-                reportData.id = reports[existingReportIndex].id;
-                reports[existingReportIndex] = reportData;
-                console.log('Report updated:', reportData);
-            } else {
-                // 添加新报告，使用新生成的ID
-                reports.push(reportData);
-                console.log('New report added:', reportData);
-            }
+            applyReport(reports, reportData);
             
             // 保存到服务器（异步）
             await saveToLocalStorage('reports', reports);
@@ -1110,8 +1236,6 @@ async function saveReport() {
             // 显示成功消息
             showAlertModal('报告保存成功！');
             
-            // 保存成功，显示"同步到数字神经"按钮
-            showSyncNerveButton();
             return; // 保存成功，退出函数
         } catch (error) {
             console.error('Error in saveReport:', error);
@@ -1125,23 +1249,46 @@ async function saveReport() {
                 delete dataVersions['reports'];
                 
                 // 短暂延迟后重试
-                await new Promise(resolve => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 400));
                 
-                // 刷新报告数据
-                const memberName = document.getElementById('memberName').value;
-                if (memberName) {
-                    await loadMemberReport();
+                // 重新获取最新报告并直接合并再保存（不刷新表单，避免打断用户）
+                try {
+                    const latestReports = await getFromLocalStorage('reports', []);
+                    const applyReport = (list, data) => {
+                        const idx = list.findIndex(r => {
+                            const isSameMember = (r.employeeId && data.employeeId && r.employeeId === data.employeeId) ||
+                                                 (r.memberName && data.memberName && r.memberName === data.memberName);
+                            return isSameMember && r.date === data.date && r.type === data.type;
+                        });
+                        if (idx !== -1) {
+                            data.id = list[idx].id;
+                            list[idx] = data;
+                        } else {
+                            list.push(data);
+                        }
+                        return list;
+                    };
+                    
+                    applyReport(latestReports, reportData);
+                    await saveToLocalStorage('reports', latestReports);
+                    
+                    document.getElementById('reportId').value = reportData.id;
+                    showAlertModal('报告保存成功！');
+                    return;
+                } catch (retryErr) {
+                    console.error('Retry save failed:', retryErr);
+                    // 继续下一个循环重试
                 }
             } else {
                 // 非版本冲突错误，直接提示
-                alert('保存失败: ' + error.message);
+                showAlertModal('保存失败: ' + error.message);
                 return;
             }
         }
     }
     
     // 超过最大重试次数
-    alert('保存失败: 数据已被其他人修改，请刷新页面后重试');
+    showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
 }
 
 // 获取内容项的值（旧版本，仅获取文本）
@@ -1852,16 +1999,12 @@ async function loadMemberReport() {
             }
             
             console.log('\n=== 报告数据加载完成 ===');
-            // 已找到当天报告，显示"同步到数字神经"按钮
-            showSyncNerveButton();
         } else {
             console.log('\n=== 未找到当天报告数据 ===');
             // 没有找到报告，清空表单（除了姓名）
             clearFormExceptName();
             // 注意：这里不清空reportId，让保存时自动生成新ID
             console.log('已清空表单内容（除了姓名）');
-            // 未找到当天报告，隐藏"同步到数字神经"按钮
-            hideSyncNerveButton();
         }
     } catch (error) {
         console.error('加载报告数据失败:', error);
@@ -2904,137 +3047,13 @@ async function deleteReport(reportId, event) {
     }
 }
 
-// 显示"同步到数字神经"按钮
-function showSyncNerveButton() {
-    const syncButton = document.querySelector('.btn-sync-nerve');
-    if (syncButton) {
-        syncButton.style.display = 'inline-block';
+// 根据进度决定工作结果：100 视为已完成，其余视为进行中
+function resolveWorkResult(progressItem = {}) {
+    const percent = Number(progressItem.progress);
+    if (!Number.isNaN(percent) && percent >= 100) {
+        return '已完成';
     }
-}
-
-
-
-// 同步到数字神经
-async function syncToNerve() {
-    try {
-        // 1. 获取当天报告数据
-        const currentMemberStr = sessionStorage.getItem('currentMember');
-        const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
-        const today = new Date().toISOString().split('T')[0];
-        const currentReportType = document.getElementById('reportType').value;
-        const reports = await getFromLocalStorage('reports', []);
-        
-        const todayReport = reports.find(report => {
-            const isSameMember = (report.employeeId && currentMember?.employeeId && report.employeeId === currentMember.employeeId) ||
-                                (report.memberName && currentMember?.name && report.memberName === currentMember.name);
-            const isSameDate = report.date === today;
-            const isSameType = report.type === currentReportType;
-            return isSameMember && isSameDate && isSameType;
-        });
-
-        if (!todayReport) {
-            alert('未找到当天的报告数据，无法同步');
-            return;
-        }
-
-        // 2. 检查是否有已保存的Cookie
-        let cookie = localStorage.getItem('nerveCookie');
-        let loginSuccess = false;
-        let password = null;
-
-        // 3. 如果有Cookie，尝试使用它进行同步
-        if (cookie) {
-            try {
-                // 这里可以添加一个验证Cookie是否有效的逻辑
-                // 例如，尝试调用一个需要Cookie的API来验证
-                // 为了简化，我们先假设Cookie是有效的
-                loginSuccess = true;
-                console.log('使用已保存的Cookie进行同步');
-            } catch (error) {
-                console.error('使用已保存的Cookie同步失败:', error);
-                // Cookie无效，清除缓存
-                localStorage.removeItem('nerveCookie');
-                cookie = null;
-            }
-        }
-
-        // 4. 如果没有Cookie或Cookie无效，需要登录获取新的Cookie
-        if (!loginSuccess) {
-            // 检查是否有缓存的密码
-            password = localStorage.getItem('nervePassword');
-
-            // 先尝试使用缓存密码登录
-            if (password) {
-                try {
-                    cookie = await loginToNerve(password);
-                    loginSuccess = true;
-                    console.log('使用缓存密码登录成功');
-                } catch (error) {
-                    console.error('使用缓存密码登录失败:', error);
-                    // 缓存密码无效，清除缓存
-                    localStorage.removeItem('nervePassword');
-                    password = null;
-                }
-            }
-
-            // 如果没有缓存密码或登录失败，显示弹窗让用户输入
-            if (!loginSuccess) {
-                // 显示自定义登录弹窗
-                openNerveLoginModal();
-                
-                // 等待用户输入密码（通过Promise实现异步等待）
-                password = await new Promise((resolve, reject) => {
-                    // 存储回调函数
-                    window.nerveLoginResolve = resolve;
-                    window.nerveLoginReject = reject;
-                });
-
-                // 验证密码
-                try {
-                    cookie = await loginToNerve(password);
-                    loginSuccess = true;
-                    // 密码验证成功，缓存密码
-                    localStorage.setItem('nervePassword', password);
-                    console.log('用户输入密码登录成功');
-                } catch (error) {
-                    console.error('数字神经登录失败:', error);
-                    // 显示错误信息
-                    const errorElement = document.getElementById('nervePasswordError');
-                    if (errorElement) {
-                        errorElement.textContent = '密码错误，请重新输入';
-                    }
-                    // 清除密码输入框
-                    const passwordInput = document.getElementById('nervePassword');
-                    if (passwordInput) {
-                        passwordInput.value = '';
-                        passwordInput.focus();
-                    }
-                    // 递归调用，让用户重新输入
-                    return syncToNerve();
-                }
-            }
-        }
-
-        // 5. 使用获取的cookie进行同步操作
-        if (cookie) {
-            const syncData = {
-                employeeId: currentMember?.employeeId || todayReport.employeeId,
-                memberName: currentMember?.name || todayReport.memberName,
-                date: todayReport.date,
-                reportType: todayReport.type,
-                content: todayReport,
-                syncTime: new Date().toISOString()
-            };
-            console.log('同步到数字神经的数据:', syncData);
-            console.log('使用的Cookie:', cookie);
-            
-            // 显示今日进展日志弹窗
-            openTodayProgressModal(todayReport.todayProgress);
-        }
-    } catch (error) {
-        console.error('同步到数字神经失败:', error);
-        alert('同步到数字神经失败：' + error.message);
-    }
+    return '进行中';
 }
 
 // 显示今日进展日志弹窗
@@ -3044,10 +3063,7 @@ async function openTodayProgressModal(todayProgress) {
     
     // 从localStorage获取所有项目数据和管理员设置
     const projects = await getFromLocalStorage('projects', []);
-    const adminSettings = await getFromLocalStorage('adminSettings', {});
-    
-    // 获取项目编号
-    const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+    const projectNumber = await getProjectNumberValue();
     
     // 构建今日进展内容的HTML表格（可编辑版本）
     let contentHTML = `
@@ -3085,33 +3101,24 @@ async function openTodayProgressModal(todayProgress) {
             const projectName = progress.project || '-';
             const milestone = progress.milestone || '里程碑';
             const milestoneName = project ? project.milestoneName : '-';
+            const workResult = resolveWorkResult(progress);
             
             contentHTML += `
                 <tr data-index="${index}">
                     <td class="editable-cell" contenteditable="true">${index + 1}</td>
-                    <td class="editable-cell" contenteditable="true">${projectCode}</td>
-                    <td class="editable-cell" contenteditable="true">${projectName}</td>
                     <td class="editable-cell" contenteditable="true">${projectNumber}</td>
+                    <td class="editable-cell" contenteditable="true">${projectName}</td>
+                    <td class="editable-cell" contenteditable="true">${projectCode}</td>
                     <td class="editable-cell" contenteditable="true">${milestoneName}</td>
                     <td class="editable-cell" contenteditable="true">${progress.content || ''}</td>
                     <td class="editable-cell" contenteditable="true">${progress.workHours || '8.0'}</td>
                     <td>
                         <select class="editable-select">
-                            <option value="软件开发" ${progress.workType === '软件开发' ? 'selected' : ''}>软件开发</option>
-                            <option value="测试" ${progress.workType === '测试' ? 'selected' : ''}>测试</option>
-                            <option value="文档编写" ${progress.workType === '文档编写' ? 'selected' : ''}>文档编写</option>
-                            <option value="会议" ${progress.workType === '会议' ? 'selected' : ''}>会议</option>
-                            <option value="其他" ${progress.workType === '其他' ? 'selected' : ''}>其他</option>
+                            <option value="5508" ${['5508', '项目晨会与周会', '会议'].includes(progress.workType) ? 'selected' : ''}>项目晨会与周会</option>
+                            <option value="4501" ${['4501', '编码', '软件开发'].includes(progress.workType) ? 'selected' : ''}>编码</option>
                         </select>
                     </td>
-                    <td>
-                        <select class="editable-select">
-                            <option value="进行中" ${progress.workResult === '进行中' ? 'selected' : ''}>进行中</option>
-                            <option value="已完成" ${progress.workResult === '已完成' ? 'selected' : ''}>已完成</option>
-                            <option value="暂停" ${progress.workResult === '暂停' ? 'selected' : ''}>暂停</option>
-                            <option value="待开始" ${progress.workResult === '待开始' ? 'selected' : ''}>待开始</option>
-                        </select>
-                    </td>
+                    <td class="editable-cell" contenteditable="true">${workResult}</td>
                     <td class="editable-cell" contenteditable="true">${progress.remarks || ''}</td>
                     <td>
                         <button class="action-btn btn-delete" onclick="deleteProgressRow(${index})">删除</button>
@@ -3154,40 +3161,28 @@ function deleteProgressRow(index) {
 }
 
 // 添加新进度行
-function addProgressRow() {
+async function addProgressRow() {
     const tableBody = document.getElementById('progressTableBody');
     const newIndex = tableBody.rows.length;
     
-    // 获取项目编号
-    const adminSettings = JSON.parse(localStorage.getItem('adminSettings') || '{}');
-    const projectNumber = adminSettings.projectNumber ? adminSettings.projectNumber.data : '';
+    const projectNumber = await getProjectNumberValue();
     
     const newRowHTML = `
         <tr data-index="${newIndex}">
             <td class="editable-cell" contenteditable="true">${newIndex + 1}</td>
-            <td class="editable-cell" contenteditable="true"></td>
-            <td class="editable-cell" contenteditable="true"></td>
             <td class="editable-cell" contenteditable="true">${projectNumber}</td>
+            <td class="editable-cell" contenteditable="true"></td>
+            <td class="editable-cell" contenteditable="true"></td>
             <td class="editable-cell" contenteditable="true"></td>
             <td class="editable-cell" contenteditable="true"></td>
             <td class="editable-cell" contenteditable="true">8.0</td>
             <td>
                 <select class="editable-select">
-                    <option value="软件开发">软件开发</option>
-                    <option value="测试">测试</option>
-                    <option value="文档编写">文档编写</option>
-                    <option value="会议">会议</option>
-                    <option value="其他">其他</option>
+                    <option value="5508">项目晨会与周会</option>
+                    <option value="4501">编码</option>
                 </select>
             </td>
-            <td>
-                <select class="editable-select">
-                    <option value="进行中" selected>进行中</option>
-                    <option value="已完成">已完成</option>
-                    <option value="暂停">暂停</option>
-                    <option value="待开始">待开始</option>
-                </select>
-            </td>
+            <td class="editable-cell" contenteditable="true">进行中</td>
             <td class="editable-cell" contenteditable="true"></td>
             <td>
                 <button class="action-btn btn-delete" onclick="deleteProgressRow(${newIndex})">删除</button>
@@ -3232,14 +3227,14 @@ async function saveProgressChanges() {
         const progressItem = {
             id: index,
             serialNumber: cells[0].textContent,
-            projectCode: project ? project.milestoneNumber : cells[1].textContent,
+            projectNumber: cells[1].textContent,
             projectName: projectName,
-            milestone: cells[3].textContent,
+            milestone: project ? project.milestoneNumber : cells[3].textContent,
             milestoneName: project ? project.milestoneName : cells[4].textContent,
             workContent: cells[5].textContent,
             workHours: parseFloat(cells[6].textContent) || 0,
             workType: cells[7].querySelector('select').value,
-            workResult: cells[8].querySelector('select').value,
+            workResult: cells[8].textContent,
             remarks: cells[9].textContent
         };
         updatedProgress.push(progressItem);
@@ -3423,143 +3418,6 @@ function cancelLogEdit(logId) {
     editContent.style.display = 'none';
     editActions.style.display = 'none';
 }
-
-// 登录数字神经API
-async function loginToNerve(password) {
-    try {
-        // 获取当前登录的成员信息
-        const currentMemberStr = sessionStorage.getItem('currentMember');
-        const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
-        
-        if (!currentMember || !currentMember.employeeId) {
-            throw new Error('未获取到员工工号信息');
-        }
-        
-        // 准备登录参数
-        const loginParams = {
-            loginName: currentMember.employeeId,
-            password: doubleMd5(password), // 使用双重MD5加密密码（32位大写）
-            rmbUser: 'on'
-        };
-        
-        // 创建URLSearchParams来发送表单数据
-        const searchParams = new URLSearchParams();
-        Object.entries(loginParams).forEach(([key, value]) => {
-            searchParams.append(key, value);
-        });
-
-        // 调用登录API
-        const response = await fetch('/api/nerve/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: searchParams.toString()
-        });
-
-        // 解析响应为JSON
-        const responseData = await response.json();
-
-        // 检查登录是否成功
-        if (!responseData.success) {
-            throw new Error(responseData.message || '登录失败');
-        }
-        
-        // 直接使用后端返回的cookie
-        if (!responseData.cookie) {
-            throw new Error('登录成功但未获取到Cookie');
-        }
-        
-        // 保存Cookie到localStorage
-        localStorage.setItem('nerveCookie', responseData.cookie);
-
-        return responseData.cookie;
-    } catch (error) {
-        console.error('数字神经登录API调用失败:', error);
-        throw new Error('登录失败：' + error.message);
-    }
-}
-
-
-
-// 打开数字神经登录弹窗
-function openNerveLoginModal() {
-    const modal = document.getElementById('nerveLoginModal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
-    
-    // 清除错误信息
-    const errorElement = document.getElementById('nervePasswordError');
-    if (errorElement) {
-        errorElement.textContent = '';
-    }
-    
-    // 清空密码输入框并聚焦
-    const passwordInput = document.getElementById('nervePassword');
-    if (passwordInput) {
-        passwordInput.value = '';
-        passwordInput.focus();
-    }
-}
-
-// 关闭数字神经登录弹窗
-function closeNerveLoginModal() {
-    const modal = document.getElementById('nerveLoginModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-    
-    // 拒绝Promise，取消登录
-    if (window.nerveLoginReject) {
-        window.nerveLoginReject(new Error('用户取消登录'));
-        // 清理回调函数
-        delete window.nerveLoginResolve;
-        delete window.nerveLoginReject;
-    }
-}
-
-// 提交数字神经登录
-function submitNerveLogin() {
-    const passwordInput = document.getElementById('nervePassword');
-    if (passwordInput) {
-        const password = passwordInput.value.trim();
-        
-        if (!password) {
-            // 显示错误信息
-            const errorElement = document.getElementById('nervePasswordError');
-            if (errorElement) {
-                errorElement.textContent = '请输入密码';
-            }
-            passwordInput.focus();
-            return;
-        }
-        
-        // 解决Promise，返回密码
-        if (window.nerveLoginResolve) {
-            window.nerveLoginResolve(password);
-            // 清理回调函数
-            delete window.nerveLoginResolve;
-            delete window.nerveLoginReject;
-        }
-        
-        // 关闭弹窗
-        const modal = document.getElementById('nerveLoginModal');
-        if (modal) {
-            modal.style.display = 'none';
-        }
-    }
-}
-
-// 隐藏"同步到数字神经"按钮
-function hideSyncNerveButton() {
-    const syncButton = document.querySelector('.btn-sync-nerve');
-    if (syncButton) {
-        syncButton.style.display = 'none';
-    }
-}
-
-
 
 // 显示报告详情弹窗
 async function showReportDetail(report) {

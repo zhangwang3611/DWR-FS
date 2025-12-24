@@ -93,7 +93,10 @@
             
             <!-- 周报内容 -->
             <div id="weeklyContent" class="report-content" style="display: none;">
-                <h3>本周完成工作</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>本周完成工作</h3>
+                    <button type="button" class="btn btn-orange" onclick="openDailyStatsModal()">统计日报</button>
+                </div>
                 <div id="weeklyDone" class="content-group">
                     <div class="content-item">
                         <select class="log-project" required>
@@ -149,35 +152,34 @@
             </div>
             
             <button type="button" class="btn btn-primary btn-save" onclick="saveReport();">保存入库</button>
-            <button type="button" class="btn btn-orange btn-sync-nerve" style="display: none; margin-left: 10px;" onclick="syncToNerve();">同步到数字神经</button>
         </form>
         
         <div id="successMessage" class="success-message" style="display: none;">
                 保存成功！
             </div>
         
-        <!-- 数字神经登录弹窗 -->
-        <div id="nerveLoginModal" class="modal">
-            <div class="modal-content nerve-login-modal">
+        <!-- 统计日报弹窗 -->
+        <div id="dailyStatsModal" class="modal">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h2>数字神经登录</h2>
-                    <span class="close" onclick="closeNerveLoginModal()">&times;</span>
+                    <h2>统计日报</h2>
+                    <span class="close" onclick="closeDailyStatsModal()">&times;</span>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="nervePassword">请输入数字神经密码：</label>
-                        <input type="password" id="nervePassword" class="form-control" placeholder="输入密码">
-                        <span class="error-text" id="nervePasswordError"></span>
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+                        <label for="dailyStatsStartDate" style="white-space: nowrap;">选择时间段</label>
+                        <input type="date" id="dailyStatsStartDate" class="form-control" style="flex: 1;">
+                        <span style="white-space: nowrap;">至</span>
+                        <input type="date" id="dailyStatsEndDate" class="form-control" style="flex: 1;">
                     </div>
                     <div class="modal-actions">
-                        <button type="button" class="btn btn-primary" onclick="submitNerveLogin()">确定</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeNerveLoginModal()">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="importDailyReportsToWeekly()">确定</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeDailyStatsModal()">取消</button>
                     </div>
                 </div>
             </div>
         </div>
         
-
     </div>
     
     <!-- 历史日志弹窗 -->

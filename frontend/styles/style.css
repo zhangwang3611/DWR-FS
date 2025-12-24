@@ -136,7 +136,7 @@ h3 {
     display: inline-block;
 }
 
-.btn-save, .btn-sync-nerve {
+.btn-save {
     display: inline-block;
     margin: 30px 10px 30px 0;
     padding: 15px 30px;
@@ -200,13 +200,6 @@ h3 {
 
 /* 成员确认弹窗特定样式 */
 .member-confirm-modal {
-    padding: 20px;
-    max-width: 350px;
-    max-height: 250px;
-}
-
-/* 数字神经登录弹窗特定样式 */
-.nerve-login-modal {
     padding: 20px;
     max-width: 350px;
     max-height: 250px;
