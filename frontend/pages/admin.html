@@ -18,6 +18,7 @@
             <button onclick="showTab('templates')" class="tab-btn">模板设置</button>
             <button onclick="showTab('settings')" class="tab-btn">项目管理</button>
             <button onclick="showTab('members')" class="tab-btn">成员管理</button>
+            <button onclick="showTab('activity')" class="tab-btn">项目活动</button>
         </div>
         
         <!-- 模板设置 -->
@@ -169,6 +170,65 @@
                     <input type="text" id="newMemberName" placeholder="输入成员姓名">
                     <input type="text" id="newEmployeeId" placeholder="输入成员工号">
                     <button onclick="addMember()" class="btn btn-primary">添加成员</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 项目活动 -->
+        <div id="activity" class="tab-content">
+            <div class="settings-group">
+                <h2>项目活动</h2>
+                <div class="activity-filters">
+                    <select id="activityYearFilter">
+                        <!-- 年份选项将动态生成 -->
+                    </select>
+                    <select id="activityMonthFilter">
+                        <option value="all">全年</option>
+                        <option value="0">1月</option>
+                        <option value="1">2月</option>
+                        <option value="2">3月</option>
+                        <option value="3">4月</option>
+                        <option value="4">5月</option>
+                        <option value="5">6月</option>
+                        <option value="6">7月</option>
+                        <option value="7">8月</option>
+                        <option value="8">9月</option>
+                        <option value="9">10月</option>
+                        <option value="10">11月</option>
+                        <option value="11">12月</option>
+                    </select>
+                    <select id="activityProjectFilter">
+                        <option value="all">所有项目</option>
+                        <!-- 项目选项将动态加载 -->
+                    </select>
+                    <button onclick="generateActivityChart()" class="btn btn-primary">生成活动图</button>
+                </div>
+                <div class="activity-chart-container">
+                    <div id="activityChart" class="activity-chart">
+                        <!-- 活动图将动态生成 -->
+                    </div>
+                    <div class="activity-legend">
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #196127;"></span>
+                            <span>高</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #239a3b;"></span>
+                            <span>中高</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #7bc96f;"></span>
+                            <span>中</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #c6e48b;"></span>
+                            <span>中低</span>
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #ebedf0;"></span>
+                            <span>低</span>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

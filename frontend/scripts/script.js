@@ -1,6 +1,33 @@
 // 全局变量
 // 管理员默认口令将从配置文件中获取
 
+// 日志工具函数
+async function log(level, message, data = null) {
+    try {
+        // 构建日志数据
+        const logData = {
+            level: level,
+            message: message,
+            data: data,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+        };
+        
+        // 发送日志到服务器
+        await fetch('/api/log', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(logData)
+        });
+    } catch (error) {
+        // 如果日志发送失败，降级到console输出
+        console.error('日志发送失败:', error);
+        console.log(`${level}: ${message}`, data);
+    }
+}
+
 // MD5加密函数
 function md5(input) {
     // 简单的MD5实现（生产环境应使用更可靠的库）
@@ -233,10 +260,10 @@ function confirmMember() {
 }
 
 // 页面加载完成后执行
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // 根据当前页面执行不同的初始化
     const pathname = window.location.pathname;
-    console.log('Current pathname:', pathname);
+    await log('info', 'Current pathname', { pathname: pathname });
     
     // 页面访问权限控制
     if (pathname.includes('admin.html')) {
@@ -249,14 +276,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         initAdminPage();
-        console.log('Admin page initialized');
+        await log('info', 'Admin page initialized');
     } else if (pathname.includes('member.html')) {
         // 检查是否通过成员入口验证
         let memberStr = sessionStorage.getItem('currentMember');
         
         // 测试环境：如果没有当前成员信息，自动设置一个测试成员
         if (!memberStr) {
-            console.log('测试环境：自动设置测试成员');
+            await log('info', '测试环境：自动设置测试成员');
             const testMember = {"name": "纪锐鑫", "employeeId": "005721"};
             sessionStorage.setItem('currentMember', JSON.stringify(testMember));
             memberStr = JSON.stringify(testMember);
@@ -268,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         initMemberPage();
-        console.log('Member page initialized');
+        await log('info', 'Member page initialized');
     }
     
     // 为首页的成员入口按钮添加点击事件
@@ -374,19 +401,19 @@ window.onclick = function(event) {
 
 // 成员页面初始化
 async function initMemberPage() {
-    console.log('initMemberPage function called');
+
     
     // 显示当前用户信息
     const currentMemberDisplay = document.getElementById('currentMemberDisplay');
     const memberNameInput = document.getElementById('memberName');
     const memberStr = sessionStorage.getItem('currentMember');
     
-    console.log('从sessionStorage获取当前成员信息:', memberStr);
+
     
     if (memberStr) {
         try {
             const member = JSON.parse(memberStr);
-            console.log('解析后的当前成员信息:', member);
+
             if (currentMemberDisplay) {
                 currentMemberDisplay.textContent = `${member.name} (${member.employeeId})`;
             }
@@ -394,10 +421,8 @@ async function initMemberPage() {
                 memberNameInput.value = member.name;
             }
         } catch (error) {
-            console.error('解析成员信息失败:', error);
+            await log('error', '解析成员信息失败', error);
         }
-    } else {
-        console.log('sessionStorage中没有当前成员信息');
     }
     
     // 显示当前日期
@@ -419,25 +444,25 @@ async function initMemberPage() {
     
     // 表单提交事件
     const reportForm = document.getElementById('reportForm');
-    console.log('Report form element found:', reportForm);
+
     
     if (reportForm) {
         reportForm.addEventListener('submit', function(e) {
-            console.log('Form submit event triggered');
+
             e.preventDefault();
             saveReport();
         });
-        console.log('Submit event listener added');
+
         
         // 直接为保存按钮添加点击事件作为备份
         const saveButton = reportForm.querySelector('.btn-save');
         if (saveButton) {
             saveButton.addEventListener('click', function(e) {
-                console.log('Save button clicked directly');
+
                 e.preventDefault();
                 reportForm.dispatchEvent(new Event('submit'));
             });
-            console.log('Save button click event listener added');
+
         }
     }
     
@@ -681,8 +706,260 @@ async function initAdminPage() {
     const dataDateElement = document.getElementById('dataDate');
     if (dataDateElement) {
         dataDateElement.setAttribute('value', new Date().toISOString().split('T')[0]);
-        console.log('Default date set:', new Date().toISOString().split('T')[0]);
+
     }
+    
+    // 初始化项目活动功能
+    await initProjectActivity();
+}
+
+// 初始化项目活动功能
+async function initProjectActivity() {
+    // 加载年份选项到筛选下拉框
+    const yearFilter = document.getElementById('activityYearFilter');
+    if (yearFilter) {
+        loadYearOptions(yearFilter);
+    }
+    
+    // 加载项目列表到筛选下拉框
+    const projectFilter = document.getElementById('activityProjectFilter');
+    if (projectFilter) {
+        await loadProjectsToActivityFilter(projectFilter);
+    }
+}
+
+// 加载年份选项
+function loadYearOptions(yearFilter) {
+    // 清空现有选项
+    yearFilter.innerHTML = '';
+    
+    // 获取当前年份
+    const currentYear = new Date().getFullYear();
+    
+    // 生成最近5年的选项
+    for (let i = currentYear - 4; i <= currentYear; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = i;
+        
+        // 设置当前年份为默认选中
+        if (i === currentYear) {
+            option.selected = true;
+        }
+        
+        yearFilter.appendChild(option);
+    }
+}
+
+// 加载项目到活动筛选下拉框
+async function loadProjectsToActivityFilter(filterElement) {
+    // 清空现有选项（保留"所有项目"）
+    const allOption = filterElement.querySelector('option[value="all"]');
+    filterElement.innerHTML = '';
+    if (allOption) {
+        filterElement.appendChild(allOption);
+    }
+    
+    // 获取项目列表
+    const projects = await getFromLocalStorage('projects', []);
+    
+    // 添加项目选项
+    projects.forEach(project => {
+        const option = document.createElement('option');
+        option.value = project.name;
+        option.textContent = project.name;
+        filterElement.appendChild(option);
+    });
+}
+
+// 生成项目活动数据
+async function generateActivityData(projectFilter = 'all', yearFilter = null, monthFilter = null) {
+    try {
+        // 获取所有报告
+        const reports = await getFromLocalStorage('reports', []);
+        const activityData = {};
+        
+        // 遍历所有报告
+        reports.forEach(report => {
+            // 只处理日报
+            if (report.type !== 'daily') return;
+            
+            const date = report.date;
+            const reportDate = new Date(date);
+            const reportYear = reportDate.getFullYear();
+            const reportMonth = reportDate.getMonth();
+            
+            // 检查年份筛选条件
+            if (yearFilter !== null && reportYear !== yearFilter) return;
+            
+            // 检查月份筛选条件
+            if (monthFilter !== null && monthFilter !== 'all' && reportMonth !== parseInt(monthFilter)) return;
+            
+            // 检查今日进展
+            if (report.todayProgress && Array.isArray(report.todayProgress)) {
+                report.todayProgress.forEach(item => {
+                    // 检查项目筛选条件
+                    if (projectFilter !== 'all' && item.project !== projectFilter) return;
+                    
+                    // 增加该日期的活动指数
+                    if (!activityData[date]) {
+                        activityData[date] = [];
+                    }
+                    
+                    // 存储具体活动内容
+                    activityData[date].push({
+                        project: item.project,
+                        content: item.content,
+                        progress: item.progress
+                    });
+                });
+            }
+        });
+        
+        return activityData;
+    } catch (error) {
+        await log('error', '生成活动数据失败', error);
+        return {};
+    }
+}
+
+// 生成活动图表
+async function generateActivityChart() {
+    try {
+        // 获取筛选条件
+        const projectFilter = document.getElementById('activityProjectFilter').value;
+        const yearFilter = parseInt(document.getElementById('activityYearFilter').value);
+        const monthFilter = document.getElementById('activityMonthFilter').value;
+        
+        // 生成活动数据
+        const activityData = await generateActivityData(projectFilter, yearFilter, monthFilter);
+        
+        // 渲染图表
+        renderActivityChart(activityData, yearFilter, monthFilter);
+    } catch (error) {
+        await log('error', '生成活动图表失败', error);
+        alert('生成活动图表失败：' + error.message);
+    }
+}
+
+// 渲染活动图表
+function renderActivityChart(activityData, yearFilter = null, monthFilter = null) {
+    const chartContainer = document.getElementById('activityChart');
+    if (!chartContainer) return;
+    
+    // 清空现有图表
+    chartContainer.innerHTML = '';
+    
+    // 根据筛选条件确定日期范围
+    let startDate, endDate;
+    if (yearFilter !== null && monthFilter !== null) {
+        // 如果有年月筛选，设置为该月的第一天到最后一天
+        if (monthFilter === 'all') {
+            // 全年筛选
+            startDate = new Date(yearFilter, 0, 1);
+            endDate = new Date(yearFilter, 11, 31);
+        } else {
+            // 特定月份筛选
+            startDate = new Date(yearFilter, parseInt(monthFilter), 1);
+            endDate = new Date(yearFilter, parseInt(monthFilter) + 1, 0);
+        }
+    } else {
+        // 默认显示最近52周
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(endDate.getDate() - 364);
+    }
+    
+    // 创建日历网格
+    const calendarGrid = document.createElement('div');
+    calendarGrid.className = 'calendar-grid';
+    
+    // 计算开始日期是周几（0是周日，6是周六）
+    const startDay = startDate.getDay();
+    
+    // 添加空的开始单元格
+    for (let i = 0; i < startDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'activity-cell empty';
+        calendarGrid.appendChild(emptyCell);
+    }
+    
+    // 添加日期单元格
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+        const dateString = currentDate.toISOString().split('T')[0];
+        const activities = activityData[dateString] || [];
+        const count = activities.length;
+        
+        const cell = document.createElement('div');
+        cell.className = 'activity-cell';
+        cell.dataset.date = dateString;
+        cell.dataset.count = count;
+        
+        // 根据活动数量设置颜色
+        if (count === 0) {
+            cell.classList.add('level-0');
+        } else if (count === 1) {
+            cell.classList.add('level-1');
+        } else if (count === 2) {
+            cell.classList.add('level-2');
+        } else if (count === 3) {
+            cell.classList.add('level-3');
+        } else {
+            cell.classList.add('level-4');
+        }
+        
+        // 添加 tooltip，显示具体活动内容
+        if (count === 0) {
+            cell.title = `${dateString}: 无活动`;
+        } else {
+            let tooltipText = `${dateString}：${count} 项活动\n\n`;
+            activities.forEach((activity, index) => {
+                tooltipText += `${index + 1}. 项目：${activity.project}\n`;
+                tooltipText += `   进展：${activity.content}\n`;
+                tooltipText += `   进度：${activity.progress}%\n`;
+            });
+            cell.title = tooltipText;
+        }
+        
+        calendarGrid.appendChild(cell);
+        
+        // 移动到下一天
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // 添加月份标签
+    const monthLabels = document.createElement('div');
+    monthLabels.className = 'month-labels';
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let currentMonth = startDate.getMonth();
+    
+    monthLabels.innerHTML += `<span class="month-label">${months[currentMonth]}</span>`;
+    
+    const labelDate = new Date(startDate);
+    while (labelDate <= endDate) {
+        if (labelDate.getDay() === 0 && labelDate.getMonth() !== currentMonth) {
+            currentMonth = labelDate.getMonth();
+            monthLabels.innerHTML += `<span class="month-label">${months[currentMonth]}</span>`;
+        }
+        labelDate.setDate(labelDate.getDate() + 1);
+    }
+    
+    // 组合图表和标签
+    const chartWrapper = document.createElement('div');
+    chartWrapper.className = 'chart-wrapper';
+    chartWrapper.appendChild(monthLabels);
+    chartWrapper.appendChild(calendarGrid);
+    
+    // 添加周几标签
+    const dayLabels = document.createElement('div');
+    dayLabels.className = 'day-labels';
+    dayLabels.innerHTML = 'Sun Mon Tue Wed Thu Fri Sat'.split(' ').map(day => `<span class="day-label">${day}</span>`).join('');
+    chartWrapper.appendChild(dayLabels);
+    
+    // 添加到图表容器
+    chartContainer.appendChild(chartWrapper);
 }
 
 // 保存项目编号
@@ -707,7 +984,7 @@ async function saveProjectNumber() {
         await saveToLocalStorage('adminSettings', adminSettings);
         alert('项目编号保存成功！');
     } catch (error) {
-        console.error('保存项目编号失败:', error);
+        await log('error', '保存项目编号失败', error);
         alert('保存失败，请重试！');
     }
 }
@@ -736,7 +1013,7 @@ async function getProjectNumberValue() {
             return fallbackNumber;
         }
     } catch (error) {
-        console.error('获取项目编号失败:', error);
+        await log('error', '获取项目编号失败', error);
     }
     return '';
 }
@@ -750,7 +1027,7 @@ async function loadProjectNumber() {
             projectNumberInput.value = projectNumber;
         }
     } catch (error) {
-        console.error('加载项目编号失败:', error);
+        await log('error', '加载项目编号失败', error);
     }
 }
 
@@ -775,6 +1052,8 @@ function showTab(tabName) {
 
 // 数据存储功能（使用HTTP请求与服务器交互）
 
+
+
 // 全局变量，存储当前数据的版本信息
 let dataVersions = {};
 
@@ -797,7 +1076,7 @@ async function getDataFromServer(key, defaultValue = []) {
             return versionedData !== null ? versionedData : defaultValue;
         }
     } catch (error) {
-        console.error('Error getting data from server:', error);
+        await log('error', 'Error getting data from server', error);
         return defaultValue;
     }
 }
@@ -836,7 +1115,7 @@ async function saveDataToServer(key, data) {
         
         return result;
     } catch (error) {
-        console.error('Error saving data to server:', error);
+        await log('error', 'Error saving data to server', error);
         throw error;
     }
 }
@@ -890,24 +1169,18 @@ async function showMissingMembers() {
         // 过滤出该日期和报告类型下已提交报告的成员
         const submittedMemberIds = new Set();
         
-        console.log(`开始处理未填写成员查询: 日期=${date}, 报告类型=${reportType}`);
-        console.log(`当前所有报告数量: ${reports.length}`);
+        await log('info', '开始处理未填写成员查询', { date, reportType, reportsCount: reports.length });
         
         // 辅助函数：递归遍历对象并收集所有members数组中的员工ID
         const collectMemberIds = (obj, parentPath = '') => {
             if (Array.isArray(obj)) {
-                console.log(`进入数组: ${parentPath}`);
                 obj.forEach((item, index) => collectMemberIds(item, `${parentPath}[${index}]`));
             } else if (typeof obj === 'object' && obj !== null) {
-                console.log(`进入对象: ${parentPath}`);
                 // 如果对象有members字段且是数组，收集员工ID
                 if (obj.members && Array.isArray(obj.members)) {
-                    console.log(`在${parentPath}找到members数组: ${JSON.stringify(obj.members)}`);
                     obj.members.forEach(employeeId => {
                         if (employeeId) {
-                            console.log(`从${parentPath}.members添加员工ID: ${employeeId}`);
                             submittedMemberIds.add(employeeId);
-                            console.log(`submittedMemberIds当前内容: ${Array.from(submittedMemberIds)}`);
                         }
                     });
                 }
@@ -920,20 +1193,15 @@ async function showMissingMembers() {
             }
         };
         
+        await log('info', '开始处理报告列表', { totalReports: reports.length });
         reports.forEach((report, index) => {
-            console.log(`\n处理报告${index+1}/${reports.length}: ID=${report.id}`);
-            console.log(`报告类型: ${report.type}, 日期: ${report.date}`);
             
             if (report.date === date && report.type === reportType) {
-                console.log(`匹配条件的报告: ${report.id}, memberName: "${report.memberName}", employeeId: ${report.employeeId}`);
-                
                 // 1. 递归遍历报告中的所有嵌套对象，收集所有members数组中的员工ID
-                console.log('\n开始递归收集成员ID...');
                 collectMemberIds(report, 'report');
                 
                 // 2. 同时处理memberName字段作为补充
                 if (report.memberName) {
-                    console.log('\n处理memberName字段...');
                     // 处理复合成员名称
                     let memberNames = [];
                     
@@ -946,15 +1214,13 @@ async function showMissingMembers() {
                         memberNames = [report.memberName];
                     }
                     
-                    console.log(`分割后的成员姓名: ${JSON.stringify(memberNames)}`);
-                    
                     // 处理每个成员名称
                     memberNames.forEach(memberName => {
                         // 清理姓名：去除首尾空格和多余空格
                         const trimmedName = memberName.trim().replace(/\s+/g, '');
                         
                         if (trimmedName) {
-                            console.log(`查找成员: "${trimmedName}"`);
+        
                             
                             // 方法1：精确匹配（优先）
                             let matchedMember = members.find(m => 
@@ -982,14 +1248,12 @@ async function showMissingMembers() {
                             
                             if (matchedMember) {
                                 if (matchedMember.employeeId) {
-                                    console.log(`找到成员: ${matchedMember.name}, 工号: ${matchedMember.employeeId}`);
                                     submittedMemberIds.add(matchedMember.employeeId);
-                                    console.log(`submittedMemberIds当前内容: ${Array.from(submittedMemberIds)}`);
                                 } else {
-                                    console.log(`成员${trimmedName}没有工号信息`);
+
                                 }
                             } else {
-                                console.log(`未找到成员${trimmedName}`);
+
                             }
                         }
                     });
@@ -997,22 +1261,18 @@ async function showMissingMembers() {
                 
                 // 3. 保留对report.employeeId的支持，作为额外保障
                 if (report.employeeId) {
-                    console.log(`\n从report.employeeId添加员工ID: ${report.employeeId}`);
                     submittedMemberIds.add(report.employeeId);
-                    console.log(`submittedMemberIds当前内容: ${Array.from(submittedMemberIds)}`);
                 }
-            } else {
-                console.log(`报告不匹配条件: 类型=${report.type}, 日期=${report.date}`);
             }
         });
         
-        console.log(`\n处理完成，所有已提交工号: ${Array.from(submittedMemberIds)}`);
-        console.log(`所有成员数量: ${members.length}`);
-        
         // 找出未提交报告的成员
         const missingMembers = members.filter(member => !submittedMemberIds.has(member.employeeId));
-        console.log(`未填写成员数量: ${missingMembers.length}`);
-        console.log(`未填写成员详情: ${JSON.stringify(missingMembers.map(m => ({name: m.name, id: m.employeeId})))}`);
+        await log('info', '未填写成员查询完成', { 
+            totalMembers: members.length, 
+            submittedCount: submittedMemberIds.size, 
+            missingCount: missingMembers.length 
+        });
         
         // 显示结果在模态窗口中
         const modal = document.getElementById('missingMembersModal');
@@ -1043,7 +1303,7 @@ async function showMissingMembers() {
         // 显示弹窗
         modal.style.display = 'block';
     } catch (error) {
-        console.error('查询未填写成员失败:', error);
+        await log('error', '查询未填写成员失败', error);
         alert('查询未填写成员失败：' + error.message);
     }
 }
@@ -1056,7 +1316,7 @@ function closeMissingMembersModal() {
 
 // 保存报告
 async function saveReport() {
-    console.log('saveReport function called');
+
     
     // 清除之前的错误消息
     clearErrors();
@@ -1140,7 +1400,7 @@ async function saveReport() {
             const date = new Date().toISOString().split('T')[0];
             const reportId = document.getElementById('reportId').value;
             
-            console.log('Report data:', { reportType, memberName, date, reportId });
+            await log('info', '开始保存报告', { reportType, memberName, date, reportId });
             
             // 获取当前成员信息
             const currentMemberStr = sessionStorage.getItem('currentMember');
@@ -1203,7 +1463,7 @@ async function saveReport() {
                 reportData.weeklyPlan = weeklyPlanItems;
             }
             
-            console.log('Complete report data:', reportData);
+            await log('debug', '完整报告数据', { reportData: reportData });
             
             // 获取现有报告（异步）
             const reports = await getFromLocalStorage('reports', []);
@@ -1228,7 +1488,7 @@ async function saveReport() {
             
             // 保存到服务器（异步）
             await saveToLocalStorage('reports', reports);
-            console.log('Report saved to server');
+            await log('info', '报告保存成功', { reportId: reportData.id });
             
             // 保存成功后，将reportId设置回页面，以便下次更新
             document.getElementById('reportId').value = reportData.id;
@@ -1238,12 +1498,12 @@ async function saveReport() {
             
             return; // 保存成功，退出函数
         } catch (error) {
-            console.error('Error in saveReport:', error);
+            await log('error', 'Error in saveReport', error);
             
             // 检查是否为版本冲突
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
-                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await log('warn', '版本冲突，重试保存', { attempt: retryAttempts, maxRetries: maxRetries });
                 
                 // 清除本地版本缓存，强制重新获取最新数据
                 delete dataVersions['reports'];
@@ -1276,7 +1536,7 @@ async function saveReport() {
                     showAlertModal('报告保存成功！');
                     return;
                 } catch (retryErr) {
-                    console.error('Retry save failed:', retryErr);
+                    await log('error', '重试保存失败', { error: retryErr });
                     // 继续下一个循环重试
                 }
             } else {
@@ -1390,7 +1650,7 @@ async function loadProjectsToDropdown(selectElement) {
             selectElement.appendChild(option);
         });
     } catch (error) {
-        console.error('加载项目数据失败:', error);
+        await log('error', '加载项目数据失败', { error: error });
         // 如果加载失败，使用默认项目
         const defaultProjects = ['数据集成平台', '数据治理平台', '数据分析', 'AI模型管理', '其他'];
         const formattedProjects = defaultProjects.map(name => ({ name, milestoneNumber: '', milestoneName: '' }));
@@ -1454,11 +1714,11 @@ async function loadMembersToDropdown(selectElement) {
             
             // 如果有当前成员，默认选中
             if (currentMember) {
-                console.log('当前成员信息:', currentMember);
-                console.log('默认选择当前成员:', currentMember.employeeId, currentMember.name);
+
+
                 renderSelectedTags(selectElement, [currentMember.employeeId]);
             } else {
-                console.log('未找到当前成员信息');
+
             }
         } else {
             // 传统select元素（兼容旧代码）
@@ -1480,7 +1740,7 @@ async function loadMembersToDropdown(selectElement) {
             });
         }
     } catch (error) {
-        console.error('加载成员数据失败:', error);
+        await log('error', '加载成员数据失败', { error: error });
         // 如果加载失败，使用默认成员
         const defaultMembers = [
             {"name": "李希明", "employeeId": "004757"},
@@ -1803,49 +2063,39 @@ async function loadYesterdayReport() {
             showAlertModal(`未找到${reportType === 'daily' ? '昨日日报' : '昨日周报'}数据`);
         }
     } catch (error) {
-        console.error('加载昨日报告失败:', error);
+        await log('error', '加载昨日报告失败', { error: error });
         showAlertModal('加载昨日报告失败，请重试');
     }
 }
 
 // 根据成员姓名和日期加载当天的报告
 async function loadMemberReport() {
-    console.log('=== loadMemberReport函数开始执行 ===');
+    await log('info', 'loadMemberReport函数开始执行');
     
     // 从sessionStorage获取当前成员信息
     const memberStr = sessionStorage.getItem('currentMember');
     let currentMember = memberStr ? JSON.parse(memberStr) : null;
     let currentEmployeeId = currentMember ? currentMember.employeeId : null;
     
-    console.log('从sessionStorage获取的currentMember:', currentMember);
-    console.log('从sessionStorage获取的currentEmployeeId:', currentEmployeeId, '类型:', typeof currentEmployeeId);
-    
     // 获取成员名称（可能从页面或currentMember中获取）
     const memberName = document.getElementById('memberName').value;
-    console.log('从页面获取的memberName:', memberName);
     
     // 如果页面中没有成员名称，尝试从currentMember中获取
     if (!memberName && currentMember) {
-        console.log('页面中没有memberName，从currentMember中获取:', currentMember.name);
         document.getElementById('memberName').value = currentMember.name;
     }
     
     const today = new Date().toISOString().split('T')[0];
-    console.log('当前日期:', today);
     
     try {
         // 获取所有报告数据
         const reports = await getFromLocalStorage('reports', []);
-        console.log('从服务器获取的所有报告数量:', reports.length);
-        console.log('所有报告详细数据:', JSON.stringify(reports));
         
         // 获取所有成员数据，用于备用查找
         const allMembers = await getFromLocalStorage('members', []);
-        console.log('从服务器获取的所有成员数量:', allMembers.length);
         
         // 如果没有currentEmployeeId但有memberName，尝试通过memberName获取employeeId
         if (!currentEmployeeId && memberName) {
-            console.log('尝试通过memberName获取employeeId，memberName:', memberName);
             
             // 清理姓名：去除首尾空格和多余空格
             const trimmedName = memberName.trim().replace(/\s+/g, '');
@@ -1875,35 +2125,25 @@ async function loadMemberReport() {
             
             if (matchedMember) {
                 currentEmployeeId = matchedMember.employeeId;
-                console.log('通过memberName找到成员:', matchedMember);
-                console.log('获取到的employeeId:', currentEmployeeId);
+                await log('info', '通过成员名称获取到员工ID', { memberName: memberName, employeeId: currentEmployeeId });
             } else {
-                console.log('未找到匹配的成员:', memberName);
+                await log('warn', '未找到匹配的成员', { memberName: memberName });
             }
         }
         
         // 确保currentEmployeeId是字符串类型
         currentEmployeeId = currentEmployeeId ? String(currentEmployeeId) : null;
-        console.log('最终使用的currentEmployeeId:', currentEmployeeId, '类型:', typeof currentEmployeeId);
         
         // 查找当天的报告
-        console.log('=== 开始查找当天报告 ===');
-        console.log('查找条件:');
-        console.log('- currentEmployeeId:', currentEmployeeId);
-        console.log('- memberName:', memberName);
-        console.log('- date:', today);
-        
         // 获取当前选择的报告类型
         const currentReportType = document.getElementById('reportType').value;
-        console.log('- currentReportType:', currentReportType);
         
-        const todayReport = reports.find((report, index) => {
-            console.log(`\n检查第${index + 1}个报告:`);
-            console.log('报告详情:', JSON.stringify(report));
-            console.log('报告employeeId:', report.employeeId, '类型:', typeof report.employeeId);
-            console.log('报告date:', report.date);
-            console.log('报告memberName:', report.memberName);
-            console.log('报告类型:', report.type);
+        const todayReport = reports.find((report) => {
+
+
+
+
+
             
             // 确保employeeId类型一致（转换为字符串比较）
             const reportEmployeeIdStr = report.employeeId ? String(report.employeeId) : null;
@@ -1918,32 +2158,28 @@ async function loadMemberReport() {
             // 匹配当前选择的报告类型
             const typeMatch = report.type === currentReportType;
             
-            console.log('匹配结果:');
-            console.log('- idMatch:', idMatch);
-            console.log('- nameMatch:', nameMatch);
-            console.log('- dateMatch:', dateMatch);
-            console.log('- typeMatch:', typeMatch);
+
+
+
+
+
             
             return (idMatch || nameMatch) && dateMatch && typeMatch;
         });
         
-        console.log('\n=== 查找结束 ===');
-        console.log('找到的当天报告:', todayReport ? JSON.stringify(todayReport) : 'null');
+
+
         
         if (todayReport) {
-            console.log('\n=== 找到当天报告，开始填充数据 ===');
-            console.log('报告ID:', todayReport.id);
-            console.log('报告类型:', todayReport.type);
+            await log('info', '找到当天报告，开始填充数据', { reportId: todayReport.id, reportType: todayReport.type });
             
             // 设置报告ID
             document.getElementById('reportId').value = todayReport.id;
-            console.log('已设置报告ID:', todayReport.id);
             
             // 设置报告类型
             const reportTypeElement = document.getElementById('reportType');
             if (reportTypeElement.value !== todayReport.type) {
                 reportTypeElement.value = todayReport.type;
-                console.log('已设置报告类型:', todayReport.type);
                 
                 // 手动切换报告类型显示，不触发onchange事件
                 const dailyContent = document.getElementById('dailyContent');
@@ -1956,58 +2192,40 @@ async function loadMemberReport() {
                     dailyContent.style.display = 'none';
                     weeklyContent.style.display = 'block';
                 }
-                console.log('已切换报告类型显示');
             }
             
             // 填充内容
             if (todayReport.type === 'daily') {
-                console.log('\n=== 填充日报内容 ===');
                 // 确保todayProgress和tomorrowPlan存在且为数组
                 const todayProgress = Array.isArray(todayReport.todayProgress) ? todayReport.todayProgress : [];
                 const tomorrowPlan = Array.isArray(todayReport.tomorrowPlan) ? todayReport.tomorrowPlan : [];
                 
-                console.log('今日进展数据:', JSON.stringify(todayProgress));
-                console.log('明日计划数据:', JSON.stringify(tomorrowPlan));
-                
                 // 填充今日进展
-                console.log('开始填充今日进展...');
                 await fillContentItems('todayProgress', todayProgress);
-                console.log('今日进展填充完成');
                 
                 // 填充明日计划
-                console.log('开始填充明日计划...');
                 await fillContentItems('tomorrowPlan', tomorrowPlan);
-                console.log('明日计划填充完成');
             } else {
-                console.log('\n=== 填充周报内容 ===');
                 // 确保weeklyDone和weeklyPlan存在且为数组
                 const weeklyDone = Array.isArray(todayReport.weeklyDone) ? todayReport.weeklyDone : [];
                 const weeklyPlan = Array.isArray(todayReport.weeklyPlan) ? todayReport.weeklyPlan : [];
                 
-                console.log('本周完成工作数据:', JSON.stringify(weeklyDone));
-                console.log('下周工作计划数据:', JSON.stringify(weeklyPlan));
-                
                 // 填充本周完成工作
-                console.log('开始填充本周完成工作...');
                 await fillContentItems('weeklyDone', weeklyDone);
-                console.log('本周完成工作填充完成');
                 
                 // 填充下周工作计划
-                console.log('开始填充下周工作计划...');
                 await fillContentItems('weeklyPlan', weeklyPlan);
-                console.log('下周工作计划填充完成');
             }
             
-            console.log('\n=== 报告数据加载完成 ===');
+
         } else {
-            console.log('\n=== 未找到当天报告数据 ===');
+            await log('info', '未找到当天报告数据，清空表单内容', { memberName: memberName, date: today });
             // 没有找到报告，清空表单（除了姓名）
             clearFormExceptName();
             // 注意：这里不清空reportId，让保存时自动生成新ID
-            console.log('已清空表单内容（除了姓名）');
         }
     } catch (error) {
-        console.error('加载报告数据失败:', error);
+        await log('error', '加载报告数据失败', { error: error });
         alert('加载报告数据失败，请重试');
     }
 }
@@ -2199,7 +2417,7 @@ async function loadMemberLogs() {
         // 渲染日志列表
         renderLogs();
     } catch (error) {
-        console.error('加载日志失败:', error);
+        await log('error', '加载日志失败', { error: error });
         alert('加载历史日志失败，请重试');
     }
 }
@@ -2285,7 +2503,7 @@ async function renderLogs() {
         
         // 辅助函数：根据进度获取显示文本
         const getProgressText = (progress) => {
-            console.log('progress:', progress);
+
             if (progress === null || progress === undefined) return '进行中';
             if (progress === 100) return '已完成';
             return `已完成${progress}%`;
@@ -2518,7 +2736,7 @@ async function copyReportContent() {
         showAlertModal('报告内容已复制到剪贴板！');
         return;
     } catch (err) {
-        console.error('Clipboard API复制失败:', err);
+        await log('error', 'Clipboard API复制失败', { error: err });
     }
     
     // 方法2：使用传统的execCommand方法（备选）
@@ -2540,7 +2758,7 @@ async function copyReportContent() {
         showAlertModal('报告内容已复制到剪贴板！');
         return;
     } catch (err) {
-        console.error('execCommand复制失败:', err);
+        await log('error', 'execCommand复制失败', { error: err });
     }
     
     // 两种方法都失败，提示手动复制
@@ -3019,15 +3237,15 @@ async function deleteReport(reportId, event) {
                 // 重新加载数据列表
                 loadReportData();
                 
-                console.log('报告删除成功:', reportId);
+                await log('info', '报告删除成功', { reportId: reportId });
                 return; // 删除成功，退出函数
             } catch (error) {
-                console.error('删除报告失败:', error);
+                await log('error', '删除报告失败', { reportId: reportId, error: error });
                 
                 // 检查是否为版本冲突
                 if (error.message && error.message.includes('Version conflict')) {
                     retryAttempts++;
-                    console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                    await log('warn', '版本冲突，重试保存', { attempt: retryAttempts, maxRetries: maxRetries });
                     
                     // 清除本地版本缓存，强制重新获取最新数据
                     delete dataVersions['reports'];
@@ -3241,7 +3459,7 @@ async function saveProgressChanges() {
     });
     
     // 这里可以添加保存到后端或本地的逻辑
-    console.log('保存的进度数据:', updatedProgress);
+
     alert('保存成功！');
 }
 
@@ -3655,11 +3873,11 @@ async function saveMemberEdit(employeeId) {
             await loadMembers();
             return;
         } catch (error) {
-            console.error('保存成员信息失败:', error);
+            await log('error', '保存成员信息失败', { error: error });
             
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
-                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                 await new Promise(resolve => setTimeout(resolve, 500));
             } else {
                 alert('保存失败: ' + error.message);
@@ -3742,12 +3960,12 @@ async function addProject() {
             newMilestoneNameInput.value = '';
             return; // 添加成功，退出函数
         } catch (error) {
-            console.error('添加项目失败:', error);
+            await log('error', '添加项目失败', { error: error });
             
             // 检查是否为版本冲突
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
-                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                 
                 // 清除本地版本缓存，强制重新获取最新数据
                 delete dataVersions['projects'];
@@ -3847,11 +4065,11 @@ async function saveProjectEdit(originalProjectName) {
             await loadProjects();
             return;
         } catch (error) {
-            console.error('保存项目信息失败:', error);
+            await log('error', '保存项目信息失败', { error: error });
             
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
-                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                 
                 // 清除本地版本缓存，强制重新获取最新数据
                 delete dataVersions['projects'];
@@ -3898,12 +4116,12 @@ async function removeProject(projectName) {
                 await loadProjects();
                 return; // 删除成功，退出函数
             } catch (error) {
-                console.error('删除项目失败:', error);
+                await log('error', '删除项目失败', { error: error });
                 
                 // 检查是否为版本冲突
                 if (error.message && error.message.includes('Version conflict')) {
                     retryAttempts++;
-                    console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                    await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                     
                     // 清除本地版本缓存，强制重新获取最新数据
                     delete dataVersions['projects'];
@@ -3958,12 +4176,12 @@ async function addMember() {
             document.getElementById('newEmployeeId').value = '';
             return;
         } catch (error) {
-            console.error('添加成员失败:', error);
+            await log('error', '添加成员失败', { error: error });
             
             // 检查是否为版本冲突
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
-                console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                 
                 // 清除本地版本缓存，强制重新获取最新数据
                 delete dataVersions['members'];
@@ -3998,12 +4216,12 @@ async function removeMember(employeeId) {
                 await loadMembers();
                 return; // 删除成功，退出函数
             } catch (error) {
-                console.error('删除成员失败:', error);
+                await log('error', '删除成员失败', { error: error });
                 
                 // 检查是否为版本冲突
                 if (error.message && error.message.includes('Version conflict')) {
                     retryAttempts++;
-                    console.log(`Version conflict, retrying... (attempt ${retryAttempts}/${maxRetries})`);
+                    await log('warn', '版本冲突，重试操作', { attempt: retryAttempts, maxRetries: maxRetries });
                     
                     // 清除本地版本缓存，强制重新获取最新数据
                     delete dataVersions['members'];

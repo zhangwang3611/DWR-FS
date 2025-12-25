@@ -232,6 +232,65 @@ const server = http.createServer((req, res) => {
             res.end();
             return;
         }
+    } else if (req.url === '/api/log' && req.method === 'POST') {
+        // Handle log request
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        if (req.method === 'OPTIONS') {
+            res.writeHead(200);
+            res.end();
+            return;
+        }
+        
+        // Read request body
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+            try {
+                const logData = JSON.parse(body);
+                // Write log using logger
+                const level = logData.level.toLowerCase();
+                if (level === 'info') {
+                    logger.info(logData.message, logData.data);
+                } else if (level === 'error') {
+                    logger.error(logData.message, logData.data);
+                } else if (level === 'warning') {
+                    logger.warning(logData.message, logData.data);
+                } else if (level === 'debug') {
+                    logger.debug(logData.message, logData.data);
+                } else {
+                    logger.info(logData.message, logData.data);
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (error) {
+                logger.error('Failed to process log request:', error);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to process log request' }));
+            }
+        });
+        
+        return;
+    }
+    
+    // API endpoints for data persistence
+    if (req.url.startsWith('/api/data')) {
+        // Set CORS headers
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        
+        // Handle OPTIONS request (CORS preflight)
+        if (req.method === 'OPTIONS') {
+            res.writeHead(200);
+            res.end();
+            return;
+        }
         
         // Parse URL to get key if present
         const urlParts = req.url.split('/');

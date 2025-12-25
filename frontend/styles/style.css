@@ -1098,6 +1098,123 @@ textarea {
     border-top: 1px solid #e9ecef;
 }
 
+/* 项目活动图表样式 */
+#activity {
+    padding: 20px;
+}
+
+.activity-filters {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.activity-filters select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 16px;
+    min-width: 200px;
+}
+
+.activity-chart-container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+.activity-chart {
+    margin-bottom: 20px;
+}
+
+.chart-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.month-labels {
+    display: grid;
+    grid-template-columns: repeat(52, 1fr);
+    width: 100%;
+    margin-bottom: 10px;
+    gap: 2px;
+}
+
+.month-label {
+    font-size: 12px;
+    color: #666;
+    font-weight: bold;
+    text-align: center;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(52, 15px);
+    gap: 2px;
+    margin: 20px 0;
+}
+
+.activity-cell {
+    width: 15px;
+    height: 15px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.activity-cell:hover {
+    opacity: 0.8;
+}
+
+/* 活动等级颜色 */
+.activity-cell.level-0 { background-color: #ebedf0; }
+.activity-cell.level-1 { background-color: #c6e48b; }
+.activity-cell.level-2 { background-color: #7bc96f; }
+.activity-cell.level-3 { background-color: #239a3b; }
+.activity-cell.level-4 { background-color: #196127; }
+
+.activity-cell.empty {
+    background-color: transparent;
+}
+
+.day-labels {
+    display: flex;
+    gap: 17px;
+    margin-top: 10px;
+}
+
+.day-labels span {
+    font-size: 10px;
+    color: #666;
+    width: 15px;
+    text-align: center;
+}
+
+.activity-legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    font-size: 12px;
+    color: #666;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
 .logs-modal .filter-controls {
     flex: 0 0 auto;
     border-bottom: 1px solid #e9ecef;
