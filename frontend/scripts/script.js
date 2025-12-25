@@ -2521,7 +2521,7 @@ async function renderLogs() {
         const getProgressText = (progress) => {
 
             if (progress === null || progress === undefined) return '进行中';
-            if (progress === 100) return '已完成';
+            if (progress > 100) return '已完成';
             return `已完成${progress}%`;
         };
 
@@ -2568,15 +2568,9 @@ async function renderLogs() {
                 <span class="log-date">${log.date}</span>
                 <span class="log-member">${log.memberName}</span>
                 <span class="log-type log-type-${log.type}">${log.type === 'daily' ? '日报' : '周报'}</span>
-                <button class="btn btn-edit-log" onclick="toggleLogEdit(${log.id})">编辑</button>
             </div>
             <div class="log-content-view">
                 ${logContent}
-            </div>
-            <div class="log-content-edit" style="display: none;"></div>
-            <div class="log-actions-edit" style="display: none;">
-                <button class="btn btn-save-edit" onclick="saveLogEdit(${log.id})">保存</button>
-                <button class="btn btn-cancel-edit" onclick="cancelLogEdit(${log.id})">取消</button>
             </div>
         `;
         
@@ -2830,7 +2824,7 @@ async function generateDailyReport(reports, date, template) {
         // 辅助函数：根据进度值获取进度文本
         const getProgressText = (progress) => {
             if (progress === null || progress === undefined) return '进行中';
-            if (progress === 100) return '已完成';
+            if (progress > 100) return '已完成';
             return `已完成${progress}%`;
         };
         
@@ -3044,7 +3038,7 @@ async function generateWeeklyReport(reports, date, template) {
         // 辅助函数：根据进度值获取进度文本
         const getProgressText = (progress) => {
             if (progress === null || progress === undefined) return '进行中';
-            if (progress === 100) return '已完成';
+            if (progress > 100) return '已完成';
             return `已完成${progress}%`;
         };
         
@@ -3484,175 +3478,6 @@ function closeTodayProgressModal() {
     document.getElementById('todayProgressModal').style.display = 'none';
 }
 
-// 切换日志编辑模式
-function toggleLogEdit(logId) {
-    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
-    if (!logItem) return;
-    
-    const viewContent = logItem.querySelector('.log-content-view');
-    const editContent = logItem.querySelector('.log-content-edit');
-    const editActions = logItem.querySelector('.log-actions-edit');
-    
-    // 获取当前日志数据
-    const log = allLogs.find(l => l.id === logId);
-    if (!log) return;
-    
-    // 如果是查看模式，切换到编辑模式
-    if (viewContent.style.display !== 'none') {
-        // 构建编辑模式的表单
-        buildLogEditForm(editContent, log);
-        
-        // 切换显示状态
-        viewContent.style.display = 'none';
-        editContent.style.display = 'block';
-        editActions.style.display = 'block';
-    } else {
-        // 切换回查看模式
-        viewContent.style.display = 'block';
-        editContent.style.display = 'none';
-        editActions.style.display = 'none';
-    }
-}
-
-// 构建日志编辑表单
-function buildLogEditForm(container, log) {
-    // 获取所有项目数据
-    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    const projectOptions = projects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-    
-    let formHTML = '';
-    
-    if (log.type === 'daily') {
-        // 构建日报编辑表单
-        formHTML = `
-            <h3>今日进展</h3>
-            <div id="edit-today-progress-${log.id}" class="content-group">
-                ${log.todayProgress.map((item, index) => buildEditWorkItem(item, index, 'todayProgress')).join('')}
-            </div>
-            <button type="button" onclick="addEditWorkItem(${log.id}, 'todayProgress')" class="btn btn-add">+ 添加今日进展</button>
-            
-            <h3>明日计划</h3>
-            <div id="edit-tomorrow-plan-${log.id}" class="content-group">
-                ${log.tomorrowPlan.map((item, index) => buildEditWorkItem(item, index, 'tomorrowPlan')).join('')}
-            </div>
-            <button type="button" onclick="addEditWorkItem(${log.id}, 'tomorrowPlan')" class="btn btn-add">+ 添加明日计划</button>
-        `;
-    } else {
-        // 构建周报编辑表单
-        formHTML = `
-            <h3>本周完成工作</h3>
-            <div id="edit-weekly-done-${log.id}" class="content-group">
-                ${log.weeklyDone.map((item, index) => buildEditWorkItem(item, index, 'weeklyDone')).join('')}
-            </div>
-            <button type="button" onclick="addEditWorkItem(${log.id}, 'weeklyDone')" class="btn btn-add">+ 添加本周完成</button>
-            
-            <h3>下周工作计划</h3>
-            <div id="edit-weekly-plan-${log.id}" class="content-group">
-                ${log.weeklyPlan.map((item, index) => buildEditWorkItem(item, index, 'weeklyPlan')).join('')}
-            </div>
-            <button type="button" onclick="addEditWorkItem(${log.id}, 'weeklyPlan')" class="btn btn-add">+ 添加下周计划</button>
-        `;
-    }
-    
-    container.innerHTML = formHTML;
-}
-
-// 构建单个工作项的编辑表单
-function buildEditWorkItem(item, index, type) {
-    const projects = JSON.parse(localStorage.getItem('projects') || '[]');
-    const projectOptions = projects.map(p => `<option value="${p}" ${item.project === p ? 'selected' : ''}>${p}</option>`).join('');
-    
-    return `
-        <div class="content-item">
-            <select class="log-project" required>
-                <option value="">请选择项目</option>
-                ${projectOptions}
-            </select>
-            <input type="text" class="log-content" placeholder="工作内容" value="${item.content || ''}" required>
-            ${type.includes('Plan') ? '' : `<div class="progress-container">
-                <input type="number" class="log-progress" placeholder="进度" min="1" max="100" value="${item.progress || ''}" required>
-                <span class="progress-percent">%</span>
-            </div>`}
-            <button type="button" onclick="removeEditWorkItem(this)" class="btn-remove">×</button>
-        </div>
-    `;
-}
-
-// 添加编辑模式下的工作项
-function addEditWorkItem(logId, type) {
-    const container = document.getElementById(`edit-${type.toLowerCase().replace(/\s/g, '-')}-${logId}`);
-    const newIndex = container.children.length;
-    container.appendChild(buildEditWorkItem({}, newIndex, type));
-}
-
-// 移除编辑模式下的工作项
-function removeEditWorkItem(btn) {
-    btn.parentElement.remove();
-}
-
-// 保存日志编辑
-function saveLogEdit(logId) {
-    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
-    const editContent = logItem.querySelector('.log-content-edit');
-    
-    // 获取当前日志数据
-    const logIndex = allLogs.findIndex(l => l.id === logId);
-    if (logIndex === -1) return;
-    
-    const log = allLogs[logIndex];
-    const updatedLog = { ...log };
-    
-    // 根据日志类型获取编辑内容
-    if (log.type === 'daily') {
-        updatedLog.todayProgress = getWorkItemsFromEdit(editContent, 'todayProgress');
-        updatedLog.tomorrowPlan = getWorkItemsFromEdit(editContent, 'tomorrowPlan');
-    } else {
-        updatedLog.weeklyDone = getWorkItemsFromEdit(editContent, 'weeklyDone');
-        updatedLog.weeklyPlan = getWorkItemsFromEdit(editContent, 'weeklyPlan');
-    }
-    
-    // 更新日志数据
-    allLogs[logIndex] = updatedLog;
-    localStorage.setItem('reports', JSON.stringify(allLogs));
-    
-    // 重新渲染日志列表
-    renderLogs();
-    
-    alert('日志保存成功！');
-}
-
-// 从编辑表单中获取工作项数据
-function getWorkItemsFromEdit(container, type) {
-    const items = [];
-    const contentGroup = container.querySelector(`[id^="edit-${type.toLowerCase().replace(/\s/g, '-')}-"]`);
-    const contentItems = contentGroup.querySelectorAll('.content-item');
-    
-    contentItems.forEach(item => {
-        const project = item.querySelector('.log-project').value;
-        const content = item.querySelector('.log-content').value;
-        const progress = item.querySelector('.log-progress') ? parseInt(item.querySelector('.log-progress').value) : null;
-        
-        items.push({ project, content, progress });
-    });
-    
-    return items;
-}
-
-// 取消日志编辑
-function cancelLogEdit(logId) {
-    const logItem = document.querySelector(`[data-log-id="${logId}"]`);
-    if (!logItem) return;
-    
-    const viewContent = logItem.querySelector('.log-content-view');
-    const editContent = logItem.querySelector('.log-content-edit');
-    const editActions = logItem.querySelector('.log-actions-edit');
-    
-    // 切换回查看模式
-    viewContent.style.display = 'block';
-    editContent.style.display = 'none';
-    editActions.style.display = 'none';
-}
-
 // 显示报告详情弹窗
 async function showReportDetail(report) {
     const modal = document.getElementById('reportDetailModal');
@@ -3670,7 +3495,7 @@ async function showReportDetail(report) {
     // 辅助函数：获取进度文本
     const getProgressText = (progress) => {
         if (progress === null || progress === undefined) return '进行中';
-        if (progress === 100) return '已完成';
+        if (progress > 100) return '已完成';
         return `已完成${progress}%`;
     };
     
