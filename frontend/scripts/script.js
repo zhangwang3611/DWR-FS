@@ -341,6 +341,9 @@ function checkAdminPassword() {
 // 全局变量存储当前选择的成员信息
 let currentMember = null;
 
+// 防止重复提交的状态变量
+let isSavingReport = false;
+
 // 关闭模态框当点击外部区域
 window.onclick = function(event) {
     // 登录弹窗
@@ -1316,6 +1319,12 @@ function closeMissingMembersModal() {
 
 // 保存报告
 async function saveReport() {
+    // 防止重复提交
+    if (isSavingReport) {
+        await log('warn', '正在保存报告，请勿重复提交');
+        return;
+    }
+    isSavingReport = true;
 
     
     // 清除之前的错误消息
@@ -1389,6 +1398,7 @@ async function saveReport() {
     }
     
     if (!isValid) {
+        isSavingReport = false;
         return;
     }
     
@@ -1496,6 +1506,7 @@ async function saveReport() {
             // 显示成功消息
             showAlertModal('报告保存成功！');
             
+            isSavingReport = false;
             return; // 保存成功，退出函数
         } catch (error) {
             await log('error', 'Error in saveReport', error);
@@ -1504,9 +1515,11 @@ async function saveReport() {
             if (error.message && error.message.includes('Version conflict')) {
                 retryAttempts++;
                 await log('warn', '版本冲突，重试保存', { attempt: retryAttempts, maxRetries: maxRetries });
+                await log('debug', '版本冲突详情', { errorMessage: error.message, retryAttempts: retryAttempts, dataVersionsReports: dataVersions['reports'] });
                 
                 // 清除本地版本缓存，强制重新获取最新数据
                 delete dataVersions['reports'];
+                await log('debug', '已清除本地版本缓存', { dataVersionsReports: dataVersions['reports'] });
                 
                 // 短暂延迟后重试
                 await new Promise(resolve => setTimeout(resolve, 400));
@@ -1534,6 +1547,7 @@ async function saveReport() {
                     
                     document.getElementById('reportId').value = reportData.id;
                     showAlertModal('报告保存成功！');
+                    isSavingReport = false;
                     return;
                 } catch (retryErr) {
                     await log('error', '重试保存失败', { error: retryErr });
@@ -1542,6 +1556,7 @@ async function saveReport() {
             } else {
                 // 非版本冲突错误，直接提示
                 showAlertModal('保存失败: ' + error.message);
+                isSavingReport = false;
                 return;
             }
         }
@@ -1549,6 +1564,7 @@ async function saveReport() {
     
     // 超过最大重试次数
     showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
+    isSavingReport = false;
 }
 
 // 获取内容项的值（旧版本，仅获取文本）
