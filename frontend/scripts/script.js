@@ -154,15 +154,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     } else if (pathname.includes('member.html')) {
         // 检查是否通过成员入口验证
         let memberStr = sessionStorage.getItem('currentMember');
-        
-        // 测试环境：如果没有当前成员信息，自动设置一个测试成员
-        if (!memberStr) {
-            await log('info', '测试环境：自动设置测试成员');
-            const testMember = {"name": "纪锐鑫", "employeeId": "005721"};
-            sessionStorage.setItem('currentMember', JSON.stringify(testMember));
-            memberStr = JSON.stringify(testMember);
-        }
-        
+    
         if (!memberStr && !document.referrer.includes('index.html')) {
             alert('您没有权限直接访问此页面，请从首页进入');
             window.location.href = '/index.html';
