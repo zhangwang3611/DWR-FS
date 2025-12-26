@@ -4,41 +4,80 @@
 // 日志工具函数
 async function log(level, message, data = null) {
     try {
+        // 获取当前操作人姓名
+        let operatorName = '未知用户';
+        if (typeof currentMember !== 'undefined' && currentMember && currentMember.name) {
+            operatorName = currentMember.name;
+        } else {
+            // 从sessionStorage获取当前成员信息
+            const memberStr = sessionStorage.getItem('currentMember');
+            if (memberStr) {
+                const member = JSON.parse(memberStr);
+                operatorName = member.name || '未知用户';
+            }
+        }
+        
+        // 在日志消息开头添加操作人姓名
+        const formattedMessage = `[${operatorName}] ${message}`;
+        
         // 构建日志数据
         const logData = {
             level: level,
-            message: message,
+            message: formattedMessage,
             data: data,
             timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent
+            userAgent: navigator.userAgent,
+            operator: operatorName
         };
         
+        // 对操作人姓名进行Base64编码，以支持中文字符
+        const encodedOperator = btoa(unescape(encodeURIComponent(operatorName)));
+        // 使用Headers对象设置请求头，确保中文字符正确传递
+        const headers = new Headers();
+        headers.append('Content-Type', 'application/json');
+        headers.append('X-Operator', encodedOperator);
+        // 确保日志级别与后端兼容 (将warn转换为warning)
+        const compatibleLogData = {
+            ...logData,
+            level: logData.level === 'warn' ? 'warning' : logData.level
+        };
         // 发送日志到服务器
         await fetch('/api/log', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(logData)
+            headers: headers,
+            body: JSON.stringify(compatibleLogData)
         });
     } catch (error) {
         // 如果日志发送失败，降级到console输出
         console.error('日志发送失败:', error);
-        console.log(`${level}: ${message}`, data);
+        // 降级输出也要包含操作人姓名
+        let operatorName = '未知用户';
+        if (typeof currentMember !== 'undefined' && currentMember && currentMember.name) {
+            operatorName = currentMember.name;
+        } else {
+            const memberStr = sessionStorage.getItem('currentMember');
+            if (memberStr) {
+                const member = JSON.parse(memberStr);
+                operatorName = member.name || '未知用户';
+            }
+        }
+        console.log(`${level}: [${operatorName}] ${message}`, data);
     }
 }
 
 // 显示工号输入弹窗
-function showEmployeeIdInput() {
+async function showEmployeeIdInput() {
     const modal = document.getElementById('employeeIdModal');
     
     // 显示弹窗
     modal.style.display = 'block';
+    await log('info', '显示工号输入弹窗');
 }
 
 // 关闭工号输入弹窗
-function closeEmployeeIdInput() {
+async function closeEmployeeIdInput() {
     document.getElementById('employeeIdModal').style.display = 'none';
+    await log('info', '关闭工号输入弹窗');
 }
 
 // 确认输入的工号
@@ -46,8 +85,11 @@ async function confirmEmployeeId() {
     const employeeId = document.getElementById('employeeId').value;
     if (!employeeId) {
         alert('请输入员工工号');
+        await log('warn', '用户尝试确认空的员工工号');
         return;
     }
+    
+    await log('info', '用户尝试确认员工工号', { employeeId });
     
     // 获取所有成员
     const members = await getFromLocalStorage('members', []);
@@ -55,17 +97,19 @@ async function confirmEmployeeId() {
     // 查找匹配的成员
     const matchedMember = members.find(member => member.employeeId === employeeId);
     
-    closeEmployeeIdInput();
+    await closeEmployeeIdInput();
     
     if (matchedMember) {
-        showMemberConfirm(matchedMember);
+        await log('info', '找到匹配的成员信息', { employeeId, memberName: matchedMember.name });
+        await showMemberConfirm(matchedMember);
     } else {
+        await log('warn', '未找到匹配的成员信息', { employeeId });
         alert('未找到匹配的成员信息，请联系管理员添加您的员工工号');
     }
 }
 
 // 显示成员确认弹窗
-function showMemberConfirm(member) {
+async function showMemberConfirm(member) {
     const modal = document.getElementById('memberConfirmModal');
     const memberInfo = document.getElementById('memberInfo');
     
@@ -80,23 +124,27 @@ function showMemberConfirm(member) {
     
     // 显示弹窗
     modal.style.display = 'block';
+    await log('info', '显示成员确认弹窗', { memberName: member.name, employeeId: member.employeeId });
 }
 
 // 关闭成员确认弹窗
-function closeMemberConfirm() {
+async function closeMemberConfirm() {
     const modal = document.getElementById('memberConfirmModal');
     modal.style.display = 'none';
     currentMember = null;
+    await log('info', '关闭成员确认弹窗');
 }
 
 // 确认成员身份并进入填写页面
-function confirmMember() {
+async function confirmMember() {
     if (currentMember) {
         // 将成员信息存储在sessionStorage中，供member.html使用
         sessionStorage.setItem('currentMember', JSON.stringify(currentMember));
         
+        await log('info', '成员身份确认成功，跳转到填写页面', { memberName: currentMember.name, employeeId: currentMember.employeeId });
+        
         // 关闭弹窗并跳转到成员页面
-        closeMemberConfirm();
+        await closeMemberConfirm();
         window.location.href = 'frontend/pages/member.html';
     }
 }
@@ -151,7 +199,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // 管理员登录相关函数
-function showAdminLogin() {
+async function showAdminLogin() {
     document.getElementById('adminLoginModal').style.display = 'block';
     document.getElementById('adminPassword').value = '';
     document.getElementById('loginError').textContent = '';
@@ -163,19 +211,24 @@ function showAdminLogin() {
             checkAdminPassword();
         }
     });
+    
+    await log('info', '显示管理员登录弹窗');
 }
 
-function closeAdminLogin() {
+async function closeAdminLogin() {
     document.getElementById('adminLoginModal').style.display = 'none';
+    await log('info', '关闭管理员登录弹窗');
 }
 
-function checkAdminPassword() {
+async function checkAdminPassword() {
     const password = document.getElementById('adminPassword').value;
     const errorElement = document.getElementById('loginError');
     
     if (password === CONFIG.ADMIN_PASSWORD) {
+        await log('info', '管理员登录成功');
         window.location.href = 'frontend/pages/admin.html';
     } else {
+        await log('warn', '管理员登录失败，密码错误');
         errorElement.textContent = '口令错误，请重试';
     }
 }
@@ -337,6 +390,7 @@ async function hasTodayDailyReport() {
 async function toggleReportType() {
     const reportTypeSelect = document.getElementById('reportType');
     const reportType = reportTypeSelect.value;
+    await log('info', '用户切换报告类型', { reportType: reportType });
     const dailyContent = document.getElementById('dailyContent');
     const weeklyContent = document.getElementById('weeklyContent');
     
@@ -398,16 +452,22 @@ function closeDailyStatsModal() {
 
 // 将时间段内日报导入周报“本周完成”
 async function importDailyReportsToWeekly() {
+    await log('info', '开始导入日报到周报', {});
+    
     const startInput = document.getElementById('dailyStatsStartDate');
     const endInput = document.getElementById('dailyStatsEndDate');
     if (!startInput || !endInput) return;
     const startDate = startInput.value;
     const endDate = endInput.value;
+    await log('info', '获取日报导入日期范围', { startDate, endDate });
+    
     if (!startDate || !endDate) {
+        await log('warn', '日报导入失败：未选择开始或结束日期', { startDate, endDate });
         showAlertModal('请选择开始和结束日期');
         return;
     }
     if (startDate > endDate) {
+        await log('warn', '日报导入失败：开始日期大于结束日期', { startDate, endDate });
         showAlertModal('开始日期不能大于结束日期');
         return;
     }
@@ -415,9 +475,12 @@ async function importDailyReportsToWeekly() {
     const currentMemberStr = sessionStorage.getItem('currentMember');
     const currentMember = currentMemberStr ? JSON.parse(currentMemberStr) : null;
     if (!currentMember) {
+        await log('error', '日报导入失败：未获取到成员信息', {});
         showAlertModal('未获取到成员信息，请重新登录');
         return;
     }
+    
+    await log('info', '获取当前成员信息', { memberName: currentMember.name, employeeId: currentMember.employeeId });
     
     const reports = await getFromLocalStorage('reports', []);
     const inRangeDaily = reports.filter(r => {
@@ -426,7 +489,10 @@ async function importDailyReportsToWeekly() {
         return sameMember && r.type === 'daily' && r.date >= startDate && r.date <= endDate;
     });
     
+    await log('info', '查找指定时间段内的日报', { startDate, endDate, foundCount: inRangeDaily.length });
+    
     if (inRangeDaily.length === 0) {
+        await log('info', '日报导入失败：所选时间段内暂无日报', { startDate, endDate });
         showAlertModal('所选时间段内暂无日报');
         return;
     }
@@ -455,9 +521,13 @@ async function importDailyReportsToWeekly() {
         });
     });
     
+    await log('info', '日报内容汇总完成，准备导入周报', { originalCount: inRangeDaily.length, importedCount: weeklyDoneItems.length });
+    
     await fillContentItems('weeklyDone', weeklyDoneItems);
     closeDailyStatsModal();
     showAlertModal('已将所选时间段内的日报导入本周完成');
+    
+    await log('success', '日报导入周报成功', { startDate, endDate, importedCount: weeklyDoneItems.length, memberName: currentMember.name });
 }
 
 // 初始化所有内容项的项目和成员下拉框
@@ -487,6 +557,7 @@ async function initContentItems() {
 
 // 添加内容项
 async function addContentItem(containerId) {
+    await log('info', '用户添加内容项', { containerId });
     const container = document.getElementById(containerId);
     const newItem = document.createElement('div');
     newItem.className = 'content-item';
@@ -543,54 +614,85 @@ async function addContentItem(containerId) {
 }
 
 // 删除内容项
-function removeContentItem(button) {
+async function removeContentItem(button) {
     const item = button.parentElement;
     const container = item.parentElement;
+    const containerId = container.id;
     
     // 至少保留一个内容项
     if (container.children.length > 1) {
         container.removeChild(item);
+        await log('info', '用户删除内容项', { containerId });
+    } else {
+        await log('warn', '用户尝试删除最后一个内容项，操作被禁止', { containerId });
     }
 }
 
 // 管理员页面初始化
 async function initAdminPage() {
+    await log('info', '管理员页面初始化开始', {});
+    
     // 加载模板
+    await log('info', '开始加载管理员模板', {});
     await loadTemplates();
+    await log('info', '管理员模板加载完成', {});
     
     // 加载系统设置
+    await log('info', '开始加载系统设置', {});
     await loadSettings();
+    await log('info', '系统设置加载完成', {});
     
     // 加载成员列表
+    await log('info', '开始加载成员列表', {});
     await loadMembers();
+    await log('info', '成员列表加载完成', {});
     
     // 加载项目编号
+    await log('info', '开始加载项目编号', {});
     await loadProjectNumber();
+    await log('info', '项目编号加载完成', {});
     
     // 设置默认日期
     const dataDateElement = document.getElementById('dataDate');
     if (dataDateElement) {
-        dataDateElement.setAttribute('value', new Date().toISOString().split('T')[0]);
-
+        const defaultDate = new Date().toISOString().split('T')[0];
+        dataDateElement.setAttribute('value', defaultDate);
+        await log('info', '设置管理员页面默认日期', { defaultDate });
     }
     
     // 初始化项目活动功能
+    await log('info', '开始初始化项目活动功能', {});
     await initProjectActivity();
+    await log('info', '项目活动功能初始化完成', {});
+    
+    await log('success', '管理员页面初始化完成', {});
 }
 
 // 初始化项目活动功能
 async function initProjectActivity() {
+    await log('info', '开始初始化项目活动功能', {});
+    
     // 加载年份选项到筛选下拉框
     const yearFilter = document.getElementById('activityYearFilter');
     if (yearFilter) {
+        await log('info', '开始加载年份选项到活动筛选', {});
         loadYearOptions(yearFilter);
+        await log('info', '年份选项加载完成', {});
+    } else {
+        await log('warn', '未找到年份筛选下拉框', { elementId: 'activityYearFilter' });
     }
     
     // 加载项目列表到筛选下拉框
     const projectFilter = document.getElementById('activityProjectFilter');
     if (projectFilter) {
+        await log('info', '开始加载项目列表到活动筛选', {});
         await loadProjectsToActivityFilter(projectFilter);
+        await log('info', '项目列表加载完成', {});
+    } else {
+        await log('warn', '未找到项目筛选下拉框', { elementId: 'activityProjectFilter' });
     }
+    
+    await log('info', '项目活动功能初始化完成', {});
 }
 
 // 加载年份选项
@@ -639,13 +741,23 @@ async function loadProjectsToActivityFilter(filterElement) {
 
 // 生成项目活动数据
 async function generateActivityData(projectFilter = 'all', yearFilter = null, monthFilter = null) {
+    await log('info', '开始生成项目活动数据', { projectFilter, yearFilter, monthFilter });
+    
     try {
         // 获取所有报告
+        await log('info', '获取所有报告数据', {});
         const reports = await getFromLocalStorage('reports', []);
+        await log('info', '报告数据获取完成', { reportCount: reports.length });
+        
         const activityData = {};
+        let processedCount = 0;
+        let validActivityCount = 0;
         
         // 遍历所有报告
+        await log('info', '开始处理报告数据', {});
         reports.forEach(report => {
+            processedCount++;
+            
             // 只处理日报
             if (report.type !== 'daily') return;
             
@@ -677,40 +789,60 @@ async function generateActivityData(projectFilter = 'all', yearFilter = null, mo
                         content: item.content,
                         progress: item.progress
                     });
+                    
+                    validActivityCount++;
                 });
             }
         });
         
+        await log('info', '项目活动数据生成完成', { 
+            processedReports: processedCount, 
+            validActivities: validActivityCount, 
+            dateCount: Object.keys(activityData).length 
+        });
+        
         return activityData;
     } catch (error) {
-        await log('error', '生成活动数据失败', error);
+        await log('error', '生成活动数据失败', { error: error.message, projectFilter, yearFilter, monthFilter });
         return {};
     }
 }
 
 // 生成活动图表
 async function generateActivityChart() {
+    await log('info', '开始生成活动图表', {});
+    
     try {
         // 获取筛选条件
         const projectFilter = document.getElementById('activityProjectFilter').value;
         const yearFilter = parseInt(document.getElementById('activityYearFilter').value);
         const monthFilter = document.getElementById('activityMonthFilter').value;
         
+        await log('info', '获取活动图表筛选条件', { projectFilter, yearFilter, monthFilter });
+        
         // 生成活动数据
+        await log('info', '开始获取活动数据', { projectFilter, yearFilter, monthFilter });
         const activityData = await generateActivityData(projectFilter, yearFilter, monthFilter);
+        await log('info', '活动数据获取完成', { dateCount: Object.keys(activityData).length });
         
         // 渲染图表
-        renderActivityChart(activityData, yearFilter, monthFilter);
+        await log('info', '开始渲染活动图表', { yearFilter, monthFilter, activityDataCount: Object.keys(activityData).length });
+        await renderActivityChart(activityData, yearFilter, monthFilter);
+        await log('info', '活动图表生成完成', { projectFilter, yearFilter, monthFilter });
     } catch (error) {
-        await log('error', '生成活动图表失败', error);
+        await log('error', '生成活动图表失败', { error: error.message });
         alert('生成活动图表失败：' + error.message);
     }
 }
 
 // 渲染活动图表
-function renderActivityChart(activityData, yearFilter = null, monthFilter = null) {
+async function renderActivityChart(activityData, yearFilter = null, monthFilter = null) {
+    await log('info', '开始渲染活动图表', { yearFilter, monthFilter, activityDataCount: Object.keys(activityData).length });
     const chartContainer = document.getElementById('activityChart');
-    if (!chartContainer) return;
+    if (!chartContainer) {
+        await log('warn', '活动图表容器不存在');
+        return;
+    }
     
     // 清空现有图表
     chartContainer.innerHTML = '';
@@ -825,6 +957,7 @@ function renderActivityChart(activityData, yearFilter = null, monthFilter = null
     
     // 添加到图表容器
     chartContainer.appendChild(chartWrapper);
+    await log('info', '活动图表渲染完成', { yearFilter, monthFilter });
 }
 
 // 保存项目编号
@@ -832,10 +965,13 @@ async function saveProjectNumber() {
     const projectNumber = document.getElementById('projectNumber').value.trim();
     if (!projectNumber) {
         alert('项目编号不能为空！');
+        await log('warn', '用户尝试保存空的项目编号');
         return;
     }
     
     try {
+        await log('info', '开始保存项目编号', { projectNumber });
+        
         // 获取当前管理员设置
         const adminSettings = await getFromLocalStorage('adminSettings', {});
         
@@ -847,9 +983,11 @@ async function saveProjectNumber() {
         
         // 保存更新后的管理员设置
         await saveToLocalStorage('adminSettings', adminSettings);
+        
+        await log('info', '项目编号保存成功', { projectNumber });
         alert('项目编号保存成功！');
     } catch (error) {
-        await log('error', '保存项目编号失败', error);
+        await log('error', '保存项目编号失败', { projectNumber, error });
         alert('保存失败，请重试！');
     }
 }
@@ -898,6 +1036,9 @@ async function loadProjectNumber() {
 
 // 显示标签页
 function showTab(tabName) {
+    // 记录用户切换标签页操作
+    log('info', `用户切换到${tabName}标签页`, { tabName: tabName });
+    
     // 隐藏所有标签内容
     const tabContents = document.querySelectorAll('.tab-content');
     tabContents.forEach(content => {
@@ -925,7 +1066,27 @@ let dataVersions = {};
 // 从服务器获取数据（处理版本信息）
 async function getDataFromServer(key, defaultValue = []) {
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}${key}`);
+        // 获取当前操作人姓名
+        let operatorName = '未知用户';
+        if (typeof currentMember !== 'undefined' && currentMember && currentMember.name) {
+            operatorName = currentMember.name;
+        } else {
+            // 从sessionStorage获取当前成员信息
+            const memberStr = sessionStorage.getItem('currentMember');
+            if (memberStr) {
+                const member = JSON.parse(memberStr);
+                operatorName = member.name || '未知用户';
+            }
+        }
+        
+        // 对操作人姓名进行Base64编码，以支持中文字符
+        const encodedOperator = btoa(unescape(encodeURIComponent(operatorName)));
+        // 使用Headers对象设置请求头，确保中文字符正确传递
+        const headers = new Headers();
+        headers.append('X-Operator', encodedOperator);
+        const response = await fetch(`${CONFIG.API_BASE_URL}${key}`, {
+            headers: headers
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -949,17 +1110,34 @@ async function getDataFromServer(key, defaultValue = []) {
 // 保存数据到服务器（处理版本信息和冲突）
 async function saveDataToServer(key, data) {
     try {
+        // 获取当前操作人姓名
+        let operatorName = '未知用户';
+        if (typeof currentMember !== 'undefined' && currentMember && currentMember.name) {
+            operatorName = currentMember.name;
+        } else {
+            // 从sessionStorage获取当前成员信息
+            const memberStr = sessionStorage.getItem('currentMember');
+            if (memberStr) {
+                const member = JSON.parse(memberStr);
+                operatorName = member.name || '未知用户';
+            }
+        }
+        
         // 构建带版本号的数据
         const versionedData = {
             data: data,
             version: dataVersions[key] || 0
         };
         
+        // 对操作人姓名进行Base64编码，以支持中文字符
+        const encodedOperator = btoa(unescape(encodeURIComponent(operatorName)));
+        // 使用Headers对象设置请求头，确保中文字符正确传递
+        const headers = new Headers();
+        headers.append('Content-Type', 'application/json');
+        headers.append('X-Operator', encodedOperator);
         const response = await fetch(`${CONFIG.API_BASE_URL}${key}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: headers,
             body: JSON.stringify(versionedData),
         });
         
@@ -1017,14 +1195,18 @@ async function showMissingMembers() {
     
     if (!date) {
         alert('请选择日期');
+        await log('warn', '用户尝试查询未填写成员但未选择日期');
         return;
     }
     
     try {
+        await log('info', '用户请求查询未填写成员', { date, reportType });
+        
         // 获取所有成员
         const members = await getFromLocalStorage('members', []);
         if (members.length === 0) {
             alert('暂无成员信息');
+            await log('warn', '尝试查询未填写成员但系统中暂无成员信息');
             return;
         }
         
@@ -1034,7 +1216,7 @@ async function showMissingMembers() {
         // 过滤出该日期和报告类型下已提交报告的成员
         const submittedMemberIds = new Set();
         
-        await log('info', '开始处理未填写成员查询', { date, reportType, reportsCount: reports.length });
+        await log('info', '开始处理未填写成员查询', { date, reportType, reportsCount: reports.length, membersCount: members.length });
         
         // 辅助函数：递归遍历对象并收集所有members数组中的员工ID
         const collectMemberIds = (obj, parentPath = '') => {
@@ -1391,41 +1573,8 @@ async function saveReport() {
                 // 短暂延迟后重试
                 await new Promise(resolve => setTimeout(resolve, 400));
                 
-                // 重新获取最新报告并直接合并再保存（不刷新表单，避免打断用户）
-                try {
-                    const latestReports = await getFromLocalStorage('reports', []);
-                    const applyReport = (list, data) => {
-                        const idx = list.findIndex(r => {
-                            const isSameMember = (r.employeeId && data.employeeId && r.employeeId === data.employeeId) ||
-                                                 (r.memberName && data.memberName && r.memberName === data.memberName);
-                            return isSameMember && r.date === data.date && r.type === data.type;
-                        });
-                        if (idx !== -1) {
-                            data.id = list[idx].id;
-                            list[idx] = data;
-                        } else {
-                            list.push(data);
-                        }
-                        return list;
-                    };
-                    
-                    applyReport(latestReports, reportData);
-                    await saveToLocalStorage('reports', latestReports);
-                    
-                    document.getElementById('reportId').value = reportData.id;
-                    showAlertModal('报告保存成功！');
-                    
-                    // 如果是日报，显示跳转数字神经按钮
-                    if (reportType === 'daily') {
-                        showJumpButton();
-                    }
-                    
-                    isSavingReport = false;
-                    return;
-                } catch (retryErr) {
-                    await log('error', '重试保存失败', { error: retryErr });
-                    // 继续下一个循环重试
-                }
+                // 继续外层while循环进行重试
+                continue;
             } else {
                 // 非版本冲突错误，直接提示
                 showAlertModal('保存失败: ' + error.message);
@@ -1436,12 +1585,12 @@ async function saveReport() {
     }
     
     // 超过最大重试次数
-showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
-isSavingReport = false;
+    showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
+    isSavingReport = false;
 }
 
 // 显示跳转数字神经按钮
-function showJumpButton() {
+async function showJumpButton() {
     const saveButton = document.querySelector('.btn-save');
     if (!saveButton) return;
     
@@ -1455,12 +1604,14 @@ function showJumpButton() {
     const jumpButton = document.createElement('button');
     jumpButton.className = 'btn btn-secondary btn-jump-neural';
     jumpButton.textContent = '跳转数字神经';
-    jumpButton.onclick = () => {
+    jumpButton.onclick = async () => {
+        await log('info', '用户点击跳转数字神经按钮');
         window.open('https://192.168.56.78/', '_blank');
     };
     
     // 将按钮添加到保存按钮的右侧
     saveButton.parentNode.insertBefore(jumpButton, saveButton.nextSibling);
+    await log('info', '显示跳转数字神经按钮');
 }
 
 // 检查并显示跳转数字神经按钮（页面加载时调用）
@@ -1517,7 +1668,8 @@ function getContentValues(containerId) {
 }
 
 // 获取内容项的详细信息（新版本，包含项目、成员和内容）
-function getContentItems(containerId) {
+async function getContentItems(containerId) {
+    await log('info', '开始获取内容项', { containerId });
     const container = document.getElementById(containerId);
     const contentItems = container.querySelectorAll('.content-item');
     const items = [];
@@ -1572,6 +1724,7 @@ function getContentItems(containerId) {
         }
     });
     
+    await log('info', '内容项获取完成', { containerId, itemCount: items.length });
     return items;
 }
 

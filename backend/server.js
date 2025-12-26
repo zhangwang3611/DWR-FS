@@ -217,14 +217,22 @@ const updateVersionedData = (data, key, newData, oldVersion) => {
 };
 
 const server = http.createServer((req, res) => {
-    logger.info(`Request for ${req.url} received`);
+    // 从请求头中获取操作人信息，并解码Base64编码的中文字符
+    let operator = req.headers['x-operator'] || '未知用户';
+    try {
+        // 尝试解码Base64编码的操作人姓名
+        operator = Buffer.from(operator, 'base64').toString('utf8');
+    } catch (e) {
+        // 如果解码失败，使用原始值
+    }
+    logger.info(`[${operator}] Request for ${req.url} received`);
     
     // API endpoints for data persistence
     if (req.url.startsWith('/api/data')) {
         // Set CORS headers
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Operator');
         
         // Handle OPTIONS request (CORS preflight)
         if (req.method === 'OPTIONS') {
@@ -232,11 +240,117 @@ const server = http.createServer((req, res) => {
             res.end();
             return;
         }
+
+        // Handle GET /api/data (get all data)
+        if (req.url === '/api/data' && req.method === 'GET') {
+            readData((err, data) => {
+                if (err) {
+                    logger.error('Error reading data:', err);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to read data' }));
+                    return;
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            });
+            return;
+        }
+
+        // Handle POST /api/data (save all data)
+        if (req.url === '/api/data' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => {
+                body += chunk.toString();
+            });
+            req.on('end', () => {
+                try {
+                    const newData = JSON.parse(body);
+                    writeData(newData, (err) => {
+                        if (err) {
+                            logger.error('Error writing data:', err);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: 'Failed to save data' }));
+                            return;
+                        }
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true }));
+                    });
+                } catch (parseErr) {
+                    logger.error('Error parsing data:', parseErr);
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid JSON data' }));
+                }
+            });
+            return;
+        }
+
+        // Handle GET /api/data/:key (get specific data item)
+        const getKeyMatch = req.url.match(/^\/api\/data\/(\w+)$/);
+        if (getKeyMatch && req.method === 'GET') {
+            const key = getKeyMatch[1];
+            readData((err, data) => {
+                if (err) {
+                    logger.error('Error reading data:', err);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to read data' }));
+                    return;
+                }
+                const versionedData = getVersionedData(data, key, []);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(versionedData));
+            });
+            return;
+        }
+
+        // Handle POST /api/data/:key (save specific data item)
+        const postKeyMatch = req.url.match(/^\/api\/data\/(\w+)$/);
+        if (postKeyMatch && req.method === 'POST') {
+            const key = postKeyMatch[1];
+            let body = '';
+            req.on('data', chunk => {
+                body += chunk.toString();
+            });
+            req.on('end', () => {
+                try {
+                    const requestData = JSON.parse(body);
+                    readData((err, data) => {
+                        if (err) {
+                            logger.error('Error reading data:', err);
+                            res.writeHead(500, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: 'Failed to read data' }));
+                            return;
+                        }
+                        
+                        const updateResult = updateVersionedData(data, key, requestData.data, requestData.version);
+                        if (updateResult.success) {
+                            writeData(data, (writeErr) => {
+                                if (writeErr) {
+                                    logger.error('Error writing data:', writeErr);
+                                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                                    res.end(JSON.stringify({ error: 'Failed to save data' }));
+                                    return;
+                                }
+                                res.writeHead(200, { 'Content-Type': 'application/json' });
+                                res.end(JSON.stringify({ success: true, newVersion: updateResult.newVersion }));
+                            });
+                        } else {
+                            res.writeHead(409, { 'Content-Type': 'application/json' });
+                            res.end(JSON.stringify({ error: 'Version conflict', currentVersion: updateResult.currentVersion }));
+                        }
+                    });
+                } catch (parseErr) {
+                    logger.error('Error parsing data:', parseErr);
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid JSON data' }));
+                }
+            });
+            return;
+        }
     } else if (req.url === '/api/log' && req.method === 'POST') {
         // Handle log request
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Operator');
         
         if (req.method === 'OPTIONS') {
             res.writeHead(200);
@@ -278,134 +392,7 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // API endpoints for data persistence
-    if (req.url.startsWith('/api/data')) {
-        // Set CORS headers
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        
-        // Handle OPTIONS request (CORS preflight)
-        if (req.method === 'OPTIONS') {
-            res.writeHead(200);
-            res.end();
-            return;
-        }
-        
-        // Parse URL to get key if present
-        const urlParts = req.url.split('/');
-        const key = urlParts[3]; // /api/data/:key
-        
-        // Handle GET requests
-        if (req.method === 'GET') {
-            readData((err, data) => {
-                if (err) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Failed to read data' }));
-                    return;
-                }
-                
-                if (key) {
-                    // Return specific data item with version
-                    const value = getVersionedData(data, key, null);
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(value));
-                } else {
-                    // Return all data
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(data));
-                }
-            });
-            return;
-        }
-        
-        // Handle POST requests
-        if (req.method === 'POST') {
-            let body = '';
-            req.on('data', chunk => {
-                body += chunk.toString();
-            });
-            
-            req.on('end', () => {
-                try {
-                    const postData = JSON.parse(body);
-                    
-                    readData((err, data) => {
-                        if (err) {
-                            res.writeHead(500, { 'Content-Type': 'application/json' });
-                            res.end(JSON.stringify({ error: 'Failed to read data' }));
-                            return;
-                        }
-                        
-                        if (key) {
-                            // Update specific data item with version check
-                            const oldVersion = postData.version || 0;
-                            const newData = postData.data;
-                            
-                            const result = updateVersionedData(data, key, newData, oldVersion);
-                            
-                            if (!result.success) {
-                                // Version conflict
-                                res.writeHead(409, { 'Content-Type': 'application/json' });
-                                res.end(JSON.stringify({
-                                    error: 'Version conflict',
-                                    conflict: true,
-                                    currentVersion: result.currentVersion
-                                }));
-                                return;
-                            }
-                            
-                            writeData(data, (writeErr) => {
-                                if (writeErr) {
-                                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                                    res.end(JSON.stringify({ error: 'Failed to save data' }));
-                                    return;
-                                }
-                                
-                                res.writeHead(200, { 'Content-Type': 'application/json' });
-                                res.end(JSON.stringify({
-                                    success: true,
-                                    data: data[key].data,
-                                    version: result.newVersion
-                                }));
-                            });
-                        } else {
-                            // Replace all data (not recommended for versioned data)
-                            // Convert plain data to versioned format
-                            const versionedData = {};
-                            Object.keys(postData).forEach(k => {
-                                if (postData[k] && postData[k].data !== undefined) {
-                                    // Already versioned
-                                    versionedData[k] = postData[k];
-                                } else {
-                                    // Convert to versioned
-                                    versionedData[k] = {
-                                        data: postData[k],
-                                        version: 1
-                                    };
-                                }
-                            });
-                            
-                            writeData(versionedData, (writeErr) => {
-                                if (writeErr) {
-                                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                                    res.end(JSON.stringify({ error: 'Failed to save data' }));
-                                    return;
-                                }
-                                
-                                res.writeHead(200, { 'Content-Type': 'application/json' });
-                                res.end(JSON.stringify({ success: true }));
-                            });
-                        }
-                    });
-                } catch (parseErr) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Invalid JSON' }));
-                }
-            });
-            return;
-        }
-    }
+
     
     // 登录接口代理转发
     if (req.url === '/api/nerve/login' && req.method === 'POST') {
