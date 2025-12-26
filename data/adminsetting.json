@@ -2,11 +2,6 @@
   "projects": {
     "data": [
       {
-        "name": "AI模型管理",
-        "milestoneNumber": "9",
-        "milestoneName": "2025AI模型管理平台提升里程碑"
-      },
-      {
         "name": "数据治理平台",
         "milestoneNumber": "8",
         "milestoneName": "2025数据治理平台提升里程碑"
@@ -20,6 +15,11 @@
         "name": "数据分析",
         "milestoneNumber": "6",
         "milestoneName": "2025大数据智能分析平台提升里程碑"
+      },
+      {
+        "name": "AI模型管理",
+        "milestoneNumber": "9",
+        "milestoneName": "2025AI模型管理平台提升里程碑"
       },
       {
         "name": "其他",
@@ -110,6 +110,10 @@
       {
         "name": "申铭吉",
         "employeeId": "005241"
+      },
+      {
+        "name": "王龙振",
+        "employeeId": "004034"
       }
     ],
     "version": 10

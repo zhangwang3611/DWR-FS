@@ -28,164 +28,6 @@ async function log(level, message, data = null) {
     }
 }
 
-// MD5加密函数
-function md5(input) {
-    // 简单的MD5实现（生产环境应使用更可靠的库）
-    function md5cycle(x, k) {
-        var a = x[0], b = x[1], c = x[2], d = x[3];
-        a = ff(a, b, c, d, k[0], 7, -680876936);
-        d = ff(d, a, b, c, k[1], 12, -389564586);
-        c = ff(c, d, a, b, k[2], 17,  606105819);
-        b = ff(b, c, d, a, k[3], 22, -1044525330);
-        a = ff(a, b, c, d, k[4], 7, -176418897);
-        d = ff(d, a, b, c, k[5], 12,  1200080426);
-        c = ff(c, d, a, b, k[6], 17, -1473231341);
-        b = ff(b, c, d, a, k[7], 22, -45705983);
-        a = ff(a, b, c, d, k[8], 7,  1770035416);
-        d = ff(d, a, b, c, k[9], 12, -1958414417);
-        c = ff(c, d, a, b, k[10], 17, -42063);
-        b = ff(b, c, d, a, k[11], 22, -1990404162);
-        a = ff(a, b, c, d, k[12], 7,  1804603682);
-        d = ff(d, a, b, c, k[13], 12, -40341101);
-        c = ff(c, d, a, b, k[14], 17, -1502002290);
-        b = ff(b, c, d, a, k[15], 22,  1236535329);
-
-        a = gg(a, b, c, d, k[1], 5, -165796510);
-        d = gg(d, a, b, c, k[6], 9, -1069501632);
-        c = gg(c, d, a, b, k[11], 14,  643717713);
-        b = gg(b, c, d, a, k[0], 20, -373897302);
-        a = gg(a, b, c, d, k[5], 5, -701558691);
-        d = gg(d, a, b, c, k[10], 9,  38016083);
-        c = gg(c, d, a, b, k[15], 14, -660478335);
-        b = gg(b, c, d, a, k[4], 20, -405537848);
-        a = gg(a, b, c, d, k[9], 5,  568446438);
-        d = gg(d, a, b, c, k[14], 9, -1019803690);
-        c = gg(c, d, a, b, k[3], 14, -187363961);
-        b = gg(b, c, d, a, k[8], 20,  1163531501);
-        a = gg(a, b, c, d, k[13], 5, -1444681467);
-        d = gg(d, a, b, c, k[2], 9, -51403784);
-        c = gg(c, d, a, b, k[7], 14,  1735328473);
-        b = gg(b, c, d, a, k[12], 20, -1926607734);
-
-        a = hh(a, b, c, d, k[5], 4, -378558);
-        d = hh(d, a, b, c, k[8], 11, -2022574463);
-        c = hh(c, d, a, b, k[11], 16,  1839030562);
-        b = hh(b, c, d, a, k[14], 23, -35309556);
-        a = hh(a, b, c, d, k[1], 4, -1530992060);
-        d = hh(d, a, b, c, k[4], 11,  1272893353);
-        c = hh(c, d, a, b, k[7], 16, -155497632);
-        b = hh(b, c, d, a, k[10], 23, -1094730640);
-        a = hh(a, b, c, d, k[13], 4,  681279174);
-        d = hh(d, a, b, c, k[0], 11, -358537222);
-        c = hh(c, d, a, b, k[3], 16, -722521979);
-        b = hh(b, c, d, a, k[6], 23,  76029189);
-        a = hh(a, b, c, d, k[9], 4, -640364487);
-        d = hh(d, a, b, c, k[12], 11, -421815835);
-        c = hh(c, d, a, b, k[15], 16,  530742520);
-        b = hh(b, c, d, a, k[2], 23, -995338651);
-
-        a = ii(a, b, c, d, k[0], 6, -198630844);
-        d = ii(d, a, b, c, k[7], 10,  1126891415);
-        c = ii(c, d, a, b, k[14], 15, -1416354905);
-        b = ii(b, c, d, a, k[5], 21, -57434055);
-        a = ii(a, b, c, d, k[12], 6,  1700485571);
-        d = ii(d, a, b, c, k[3], 10, -1894986606);
-        c = ii(c, d, a, b, k[10], 15, -1051523);
-        b = ii(b, c, d, a, k[1], 21, -2054922799);
-        a = ii(a, b, c, d, k[8], 6,  1873313359);
-        d = ii(d, a, b, c, k[15], 10, -30611744);
-        c = ii(c, d, a, b, k[6], 15, -1560198380);
-        b = ii(b, c, d, a, k[13], 21,  1309151649);
-        a = ii(a, b, c, d, k[4], 6, -145523070);
-        d = ii(d, a, b, c, k[11], 10, -1120210379);
-        c = ii(c, d, a, b, k[2], 15,  718787259);
-        b = ii(b, c, d, a, k[9], 21, -343485551);
-
-        x[0] = add32(a, x[0]);
-        x[1] = add32(b, x[1]);
-        x[2] = add32(c, x[2]);
-        x[3] = add32(d, x[3]);
-    }
-
-    function cmn(q, a, b, x, s, t) {
-        a = add32(add32(a, q), add32(x, t));
-        return add32((a << s) | (a >>> (32 - s)), b);
-    }
-
-    function ff(a, b, c, d, x, s, t) {
-        return cmn((b & c) | ((~b) & d), a, b, x, s, t);
-    }
-
-    function gg(a, b, c, d, x, s, t) {
-        return cmn((b & d) | (c & (~d)), a, b, x, s, t);
-    }
-
-    function hh(a, b, c, d, x, s, t) {
-        return cmn(b ^ c ^ d, a, b, x, s, t);
-    }
-
-    function ii(a, b, c, d, x, s, t) {
-        return cmn(c ^ (b | (~d)), a, b, x, s, t);
-    }
-
-    function md51(s) {
-        txt = '';
-        var n = s.length, state = [1732584193, -271733879, -1732584194, 271733878];
-        for (var i = 64; i <= s.length; i += 64) {
-            md5cycle(state, md5blk(s.substring(i - 64, i)));
-        }
-        s = s.substring(i - 64);
-        var tail = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        for (var j = 0; j < s.length; j++)
-            tail[j >> 2] |= s.charCodeAt(j) << ((j % 4) << 3);
-        tail[j >> 2] |= 0x80 << ((j % 4) << 3);
-        if (j > 55) {
-            md5cycle(state, tail);
-            for (var k = 0; k < 16; k++) tail[k] = 0;
-        }
-        tail[14] = n * 8;
-        md5cycle(state, tail);
-        return state;
-    }
-
-    function md5blk(s) {
-        var md5blks = [];
-        for (var i = 0; i < 64; i += 4) {
-            md5blks[i >> 2] = s.charCodeAt(i) + (s.charCodeAt(i + 1) << 8) + (s.charCodeAt(i + 2) << 16) + (s.charCodeAt(i + 3) << 24);
-        }
-        return md5blks;
-    }
-
-    var hex_chr = '0123456789abcdef'.split('');
-
-    function rhex(n) {
-        var s = '', j = 0;
-        for (; j < 4; j++)
-            s += hex_chr[(n >> (j * 8 + 4)) & 0x0F] + hex_chr[(n >> (j * 8)) & 0x0F];
-        return s;
-    }
-
-    function hex(x) {
-        for (var i = 0; i < x.length; i++)
-            x[i] = rhex(x[i]);
-        return x.join('');
-    }
-
-    function add32(a, b) {
-        return (a + b) & 0xFFFFFFFF;
-    }
-
-    return hex(md51(input));
-}
-
-// 双重MD5加密函数（32位大写）
-function doubleMd5(password) {
-    // 第一次MD5加密
-    const firstMd5 = md5(password);
-    // 第二次MD5加密并转换为大写
-    return md5(firstMd5).toUpperCase();
-}
-
 // 显示工号输入弹窗
 function showEmployeeIdInput() {
     const modal = document.getElementById('employeeIdModal');
@@ -471,6 +313,9 @@ async function initMemberPage() {
     
     // 初始化日志功能
     initLogs();
+    
+    // 检查并显示跳转数字神经按钮
+    checkAndShowJumpButton();
 }
 
 // 检查当天日报是否已填写
@@ -510,9 +355,16 @@ async function toggleReportType() {
     if (reportType === 'daily') {
         dailyContent.style.display = 'block';
         weeklyContent.style.display = 'none';
+        // 切换到日报类型时，检查并显示跳转数字神经按钮
+        checkAndShowJumpButton();
     } else {
         dailyContent.style.display = 'none';
         weeklyContent.style.display = 'block';
+        // 切换到周报类型时，隐藏跳转数字神经按钮
+        const jumpButton = document.querySelector('.btn-jump-neural');
+        if (jumpButton) {
+            jumpButton.remove();
+        }
     }
     
     // 切换报告类型时清空reportId，确保新报告生成新的ID
@@ -579,17 +431,27 @@ async function importDailyReportsToWeekly() {
         return;
     }
     
-    // 汇总今日进展到周报本周完成
+    // 汇总今日进展到周报本周完成（去重，不包含进度）
     const weeklyDoneItems = [];
+    const contentSet = new Set(); // 用于去重
     inRangeDaily.sort((a, b) => a.date.localeCompare(b.date));
     inRangeDaily.forEach(report => {
         (report.todayProgress || []).forEach(item => {
-            weeklyDoneItems.push({
-                project: item.project || '',
-                members: item.members || [],
-                content: item.content || '',
-                progress: item.progress
-            });
+            const content = item.content || '';
+            const project = item.project || '';
+            const members = item.members || [];
+            // 对成员数组排序以确保相同成员组合的key一致
+            const sortedMembers = [...members].sort();
+            const key = `${project}-${content}-${JSON.stringify(sortedMembers)}`; // 按项目、内容和成员去重
+            if (!contentSet.has(key)) {
+                contentSet.add(key);
+                weeklyDoneItems.push({
+                    project: project,
+                    members: members,
+                    content: content
+                    // 不包含progress字段
+                });
+            }
         });
     });
     
@@ -1502,12 +1364,17 @@ async function saveReport() {
             
             // 保存成功后，将reportId设置回页面，以便下次更新
             document.getElementById('reportId').value = reportData.id;
-            
-            // 显示成功消息
-            showAlertModal('报告保存成功！');
-            
-            isSavingReport = false;
-            return; // 保存成功，退出函数
+                
+                // 显示成功消息
+                showAlertModal('报告保存成功！');
+                
+                // 如果是日报，显示跳转数字神经按钮
+                if (reportType === 'daily') {
+                    showJumpButton();
+                }
+                
+                isSavingReport = false;
+                return; // 保存成功，退出函数
         } catch (error) {
             await log('error', 'Error in saveReport', error);
             
@@ -1547,6 +1414,12 @@ async function saveReport() {
                     
                     document.getElementById('reportId').value = reportData.id;
                     showAlertModal('报告保存成功！');
+                    
+                    // 如果是日报，显示跳转数字神经按钮
+                    if (reportType === 'daily') {
+                        showJumpButton();
+                    }
+                    
                     isSavingReport = false;
                     return;
                 } catch (retryErr) {
@@ -1563,8 +1436,69 @@ async function saveReport() {
     }
     
     // 超过最大重试次数
-    showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
-    isSavingReport = false;
+showAlertModal('保存失败: 数据已被其他人修改，请刷新页面后重试');
+isSavingReport = false;
+}
+
+// 显示跳转数字神经按钮
+function showJumpButton() {
+    const saveButton = document.querySelector('.btn-save');
+    if (!saveButton) return;
+    
+    // 移除已存在的跳转按钮，避免重复添加
+    const existingJumpButton = saveButton.nextElementSibling;
+    if (existingJumpButton && existingJumpButton.classList.contains('btn-jump-neural')) {
+        existingJumpButton.remove();
+    }
+    
+    // 创建新的跳转按钮
+    const jumpButton = document.createElement('button');
+    jumpButton.className = 'btn btn-secondary btn-jump-neural';
+    jumpButton.textContent = '跳转数字神经';
+    jumpButton.onclick = () => {
+        window.open('https://192.168.56.78/', '_blank');
+    };
+    
+    // 将按钮添加到保存按钮的右侧
+    saveButton.parentNode.insertBefore(jumpButton, saveButton.nextSibling);
+}
+
+// 检查并显示跳转数字神经按钮（页面加载时调用）
+async function checkAndShowJumpButton() {
+    const reportType = document.getElementById('reportType').value;
+    // 只在日报类型下检查
+    if (reportType !== 'daily') {
+        // 如果是周报，隐藏可能存在的跳转按钮
+        const jumpButton = document.querySelector('.btn-jump-neural');
+        if (jumpButton) {
+            jumpButton.remove();
+        }
+        return;
+    }
+    
+    const memberName = document.getElementById('memberName').value;
+    const date = new Date().toISOString().split('T')[0];
+    
+    if (!memberName) return;
+    
+    try {
+        // 获取所有报告
+        const reports = await getFromLocalStorage('reports', []);
+        
+        // 检查是否存在当天的日报
+        const hasSavedDailyReport = reports.some(report => {
+            const isSameMember = (report.employeeId && report.employeeId === currentMember?.employeeId) ||
+                                 (report.memberName && report.memberName === memberName);
+            return report.type === 'daily' && report.date === date && isSameMember;
+        });
+        
+        // 如果存在，显示跳转按钮
+        if (hasSavedDailyReport) {
+            showJumpButton();
+        }
+    } catch (error) {
+        console.error('检查日报是否已保存失败:', error);
+    }
 }
 
 // 获取内容项的值（旧版本，仅获取文本）
@@ -2652,14 +2586,6 @@ function initLogs() {
     if (resetBtn) resetBtn.addEventListener('click', resetFilters);
 }
 
-// 重置内容项
-function resetContentItems() {
-    resetContentContainer('todayProgress');
-    resetContentContainer('tomorrowPlan');
-    resetContentContainer('weeklyDone');
-    resetContentContainer('weeklyPlan');
-}
-
 // 模板相关函数
 
 // 保存模板
@@ -2784,21 +2710,36 @@ function calculateDateOffsets(baseDate, daysOffset) {
 
 // 生成日报报告（按项目分类格式）
 async function generateDailyReport(reports, date, template) {
-    // 提取所有项目（从每条日志条目中）
-    const projects = new Set();
+    // 获取用户预设的项目顺序
+    const userProjects = await getFromLocalStorage('projects', []);
+    const userProjectNames = userProjects.map(project => project.name);
+    
+    // 提取报告中实际存在的项目
+    const existingProjects = new Set();
     reports.forEach(report => {
         if (report.todayProgress) {
             report.todayProgress.forEach(item => {
-                if (item.project) projects.add(item.project);
+                if (item.project) existingProjects.add(item.project);
             });
         }
         if (report.tomorrowPlan) {
             report.tomorrowPlan.forEach(item => {
-                if (item.project) projects.add(item.project);
+                if (item.project) existingProjects.add(item.project);
             });
         }
     });
-    const projectList = [...projects];
+    
+    // 按用户预设顺序排列项目，未预设的项目放在末尾
+    const projectList = [];
+    // 先添加用户预设顺序中存在于报告中的项目
+    userProjectNames.forEach(projectName => {
+        if (existingProjects.has(projectName)) {
+            projectList.push(projectName);
+            existingProjects.delete(projectName); // 避免重复添加
+        }
+    });
+    // 再添加剩余的项目（报告中存在但未在预设列表中的项目）
+    projectList.push(...existingProjects);
     
     // 组织今日进展数据（按项目分类）
     const todayProgress = {};
@@ -2998,21 +2939,36 @@ async function generateDailyReport(reports, date, template) {
 
 // 生成周报报告（按项目分类格式，参考日报合并逻辑）
 async function generateWeeklyReport(reports, date, template) {
-    // 提取所有项目（从每条日志条目中）
-    const projects = new Set();
+    // 获取用户预设的项目顺序
+    const userProjects = await getFromLocalStorage('projects', []);
+    const userProjectNames = userProjects.map(project => project.name);
+    
+    // 提取报告中实际存在的项目
+    const existingProjects = new Set();
     reports.forEach(report => {
         if (report.weeklyDone) {
             report.weeklyDone.forEach(item => {
-                if (item.project) projects.add(item.project);
+                if (item.project) existingProjects.add(item.project);
             });
         }
         if (report.weeklyPlan) {
             report.weeklyPlan.forEach(item => {
-                if (item.project) projects.add(item.project);
+                if (item.project) existingProjects.add(item.project);
             });
         }
     });
-    const projectList = [...projects];
+    
+    // 按用户预设顺序排列项目，未预设的项目放在末尾
+    const projectList = [];
+    // 先添加用户预设顺序中存在于报告中的项目
+    userProjectNames.forEach(projectName => {
+        if (existingProjects.has(projectName)) {
+            projectList.push(projectName);
+            existingProjects.delete(projectName); // 避免重复添加
+        }
+    });
+    // 再添加剩余的项目（报告中存在但未在预设列表中的项目）
+    projectList.push(...existingProjects);
     
     // 组织本周完成工作数据（按项目分类）
     const weeklyDone = {};

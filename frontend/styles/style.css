@@ -47,6 +47,11 @@ h3 {
     font-size: 16px;
     margin: 5px;
     transition: background-color 0.3s;
+    height: 40px;
+    line-height: 20px;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .btn-primary {
@@ -100,6 +105,21 @@ h3 {
     padding: 5px 10px;
     font-size: 14px;
     margin: 10px 0;
+    height: 32px;
+    line-height: 22px;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* 跳转数字神经按钮样式 */
+.btn-jump-neural {
+    background-color: #105d7c;
+    color: #fff;
+}
+
+.btn-jump-neural:hover {
+    background-color: #105d7c;
 }
 
 .btn-add:hover {
@@ -128,20 +148,26 @@ h3 {
 /* 列表删除按钮样式 */
 .report-row .btn-remove {
     width: auto;
-    height: auto;
+    height: 36px;
     border-radius: 5px;
     padding: 8px 15px;
     font-size: 14px;
     margin-left: 20px;
     display: inline-block;
+    line-height: 20px;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
 .btn-save {
     display: inline-block;
     margin: 30px 10px 30px 0;
-    padding: 15px 30px;
+    padding: 10px 30px;
     font-size: 18px;
     vertical-align: middle;
+    line-height: 20px;
+    height: 40px;
+    box-sizing: border-box;
 }
 
 /* 菜单样式 */
@@ -155,6 +181,11 @@ h3 {
 .menu .btn {
     padding: 15px 30px;
     font-size: 18px;
+    height: 50px;
+    line-height: 20px;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* 模态框样式 */
@@ -947,6 +978,11 @@ textarea {
     border: none;
     cursor: pointer;
     font-size: 14px;
+    height: 36px;
+    line-height: 20px;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .table-actions .btn-primary {
@@ -998,6 +1034,10 @@ textarea {
     font-size: 12px;
     float: right;
     margin-top: -2px;
+    height: 24px;
+    line-height: 16px;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
 .btn-edit-log:hover {
@@ -1024,6 +1064,11 @@ textarea {
     cursor: pointer;
     font-size: 14px;
     margin-left: 10px;
+    height: 32px;
+    line-height: 20px;
+    box-sizing: border-box;
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .btn-save-edit {
@@ -1371,12 +1416,14 @@ textarea {
 
 .pagination .btn {
     min-width: 100px;
+    text-align: center;
 }
 
 .pagination .btn:disabled {
     background-color: #bdc3c7;
     cursor: not-allowed;
     opacity: 0.6;
+    text-align: center;
 }
 
 #pageInfo {
