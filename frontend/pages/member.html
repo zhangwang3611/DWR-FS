@@ -261,6 +261,27 @@
             </div>
         </div>
     </div>
+    
+    <!-- 其他成员已填写日志弹窗 -->
+    <div id="otherMemberReportsModal" class="modal">
+        <div class="modal-content other-member-reports-modal">
+            <div class="modal-header">
+                <h2>提示：其他成员已包含您</h2>
+                <span class="close" onclick="closeOtherMemberReportsModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="color: #2196F3; margin-bottom: 15px; font-weight: bold;">
+                    以下成员在今天的日志中将您添加为成员。您仍可以正常填写自己的日志：
+                </p>
+                <div id="otherMemberReportsList" class="other-member-reports-list">
+                    <!-- 日志列表将通过JavaScript动态生成 -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="closeOtherMemberReportsModal()">确定</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/config/frontend-config.js"></script>
     <script src="../scripts/script.js"></script>

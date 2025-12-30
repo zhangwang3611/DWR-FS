@@ -21,7 +21,15 @@ const mimeTypes = {
     '.css': 'text/css',
     '.js': 'text/javascript',
     '.txt': 'text/plain',
-    '.json': 'application/json'
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.ico': 'image/x-icon'
 };
 
 // Helper function to initialize data file with versioned structure
@@ -45,7 +53,9 @@ const initializeDataFile = (filePath, callback) => {
         initialData = {};
     }
     
-    fs.writeFile(filePath, JSON.stringify(initialData, null, 2), 'utf8', (err) => {
+    // 确保使用 UTF-8 编码初始化文件
+    const jsonString = JSON.stringify(initialData, null, 2);
+    fs.writeFile(filePath, jsonString, { encoding: 'utf8', flag: 'w' }, (err) => {
         if (err) {
             logger.error('Error initializing data file:', err);
             return callback(err);
@@ -110,31 +120,95 @@ const readData = (callback) => {
     });
 };
 
+// Helper function to write data to file atomically
+const writeFileAtomic = (filePath, content, callback) => {
+    const tempPath = filePath + '.tmp';
+    // 确保内容以 UTF-8 编码写入，使用明确的编码选项
+    fs.writeFile(tempPath, content, { encoding: 'utf8', flag: 'w' }, (err) => {
+        if (err) {
+            logger.error(`Error writing temp file ${tempPath}:`, err);
+            return callback(err);
+        }
+        // Atomically replace the original file
+        fs.rename(tempPath, filePath, (renameErr) => {
+            if (renameErr) {
+                logger.error(`Error renaming temp file ${tempPath} to ${filePath}:`, renameErr);
+                // Try to clean up temp file
+                fs.unlink(tempPath, () => {});
+                return callback(renameErr);
+            }
+            callback(null);
+        });
+    });
+};
+
 // Helper function to write data to file
+// Only writes files that actually contain data changes
 const writeData = (data, callback) => {
     // Split data into main data and reports data
     const mainData = { ...data };
-    const reportsData = { reports: mainData.reports };
+    const hasReports = mainData.hasOwnProperty('reports') && mainData.reports !== undefined;
+    const reportsData = hasReports ? { reports: mainData.reports } : null;
     
     // Remove reports from main data
     delete mainData.reports;
     
-    // Write to both files
-    fs.writeFile(DATA_FILE, JSON.stringify(mainData, null, 2), 'utf8', (err1) => {
-        if (err1) {
-            logger.error('Error writing data file:', err1);
-            return callback(err1);
-        }
-        
-        fs.writeFile(REPORTS_FILE, JSON.stringify(reportsData, null, 2), 'utf8', (err2) => {
-            if (err2) {
-                logger.error('Error writing reports file:', err2);
-                return callback(err2);
+    // Check if mainData has any meaningful content (not just empty object)
+    const hasMainData = Object.keys(mainData).length > 0 && 
+                        Object.values(mainData).some(v => v !== null && v !== undefined);
+    
+    // Determine which files need to be written
+    const needsMainFile = hasMainData;
+    const needsReportsFile = hasReports;
+    
+    // If neither file needs updating, just callback
+    if (!needsMainFile && !needsReportsFile) {
+        return callback(null);
+    }
+    
+    // Write files that need updating
+    const writePromises = [];
+    
+    // Helper function to safely stringify JSON with proper Unicode handling
+    const safeStringify = (obj) => {
+        // JSON.stringify 默认会正确处理 Unicode 字符
+        // 使用 replacer 和 space 参数确保格式化和正确编码
+        return JSON.stringify(obj, (key, value) => {
+            // 确保所有字符串值都正确编码
+            if (typeof value === 'string') {
+                return value;
             }
-            
-            callback(null);
+            return value;
+        }, 2);
+    };
+    
+    if (needsMainFile) {
+        writePromises.push(new Promise((resolve, reject) => {
+            const jsonString = safeStringify(mainData);
+            writeFileAtomic(DATA_FILE, jsonString, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        }));
+    }
+    
+    if (needsReportsFile) {
+        writePromises.push(new Promise((resolve, reject) => {
+            const jsonString = safeStringify(reportsData);
+            writeFileAtomic(REPORTS_FILE, jsonString, (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        }));
+    }
+    
+    // Wait for all writes to complete
+    Promise.all(writePromises)
+        .then(() => callback(null))
+        .catch((err) => {
+            logger.error('Error writing data files:', err);
+            callback(err);
         });
-    });
 };
 
 // Helper function to get versioned data for a key
@@ -258,12 +332,14 @@ const server = http.createServer((req, res) => {
 
         // Handle POST /api/data (save all data)
         if (req.url === '/api/data' && req.method === 'POST') {
-            let body = '';
+            const chunks = [];
             req.on('data', chunk => {
-                body += chunk.toString();
+                chunks.push(chunk);
             });
             req.on('end', () => {
                 try {
+                    // 使用 Buffer 来确保正确解析 UTF-8 编码的数据
+                    const body = Buffer.concat(chunks).toString('utf8');
                     const newData = JSON.parse(body);
                     writeData(newData, (err) => {
                         if (err) {
@@ -306,12 +382,14 @@ const server = http.createServer((req, res) => {
         const postKeyMatch = req.url.match(/^\/api\/data\/(\w+)$/);
         if (postKeyMatch && req.method === 'POST') {
             const key = postKeyMatch[1];
-            let body = '';
+            const chunks = [];
             req.on('data', chunk => {
-                body += chunk.toString();
+                chunks.push(chunk);
             });
             req.on('end', () => {
                 try {
+                    // 使用 Buffer 来确保正确解析 UTF-8 编码的数据
+                    const body = Buffer.concat(chunks).toString('utf8');
                     const requestData = JSON.parse(body);
                     readData((err, data) => {
                         if (err) {
@@ -359,13 +437,15 @@ const server = http.createServer((req, res) => {
         }
         
         // Read request body
-        let body = '';
+        const chunks = [];
         req.on('data', chunk => {
-            body += chunk.toString();
+            chunks.push(chunk);
         });
         
         req.on('end', () => {
             try {
+                // 使用 Buffer 来确保正确解析 UTF-8 编码的数据
+                const body = Buffer.concat(chunks).toString('utf8');
                 const logData = JSON.parse(body);
                 // Write log using logger
                 const level = logData.level.toLowerCase();
@@ -409,12 +489,14 @@ const server = http.createServer((req, res) => {
         }
         
         // 读取请求体
-        let body = '';
+        const chunks = [];
         req.on('data', chunk => {
-            body += chunk.toString();
+            chunks.push(chunk);
         });
         
         req.on('end', () => {
+            // 使用 Buffer 来确保正确解析 UTF-8 编码的数据
+            const body = Buffer.concat(chunks).toString('utf8');
             // 解析表单数据
             let formData;
             try {
@@ -549,9 +631,13 @@ const server = http.createServer((req, res) => {
     // Determine MIME type
     const extname = path.extname(filePath);
     const contentType = mimeTypes[extname] || 'application/octet-stream';
+    
+    // Check if file is binary (images, etc.)
+    const isBinary = extname.match(/\.(png|jpg|jpeg|gif|svg|webp|bmp|ico|pdf|zip|rar|exe|dll)$/i);
 
-    // Read and serve the static file with utf-8 encoding
-    fs.readFile(filePath, 'utf-8', (error, content) => {
+    // Read and serve the static file
+    // Use binary encoding for images and other binary files, utf-8 for text files
+    fs.readFile(filePath, isBinary ? null : 'utf-8', (error, content) => {
         if (error) {
             if (error.code === 'ENOENT') {
                 // File not found
@@ -565,7 +651,13 @@ const server = http.createServer((req, res) => {
         } else {
             // Success
             res.writeHead(200, { 'Content-Type': contentType });
-            res.end(content, 'utf-8');
+            // For binary files, content is already a Buffer, pass it directly
+            // For text files, pass as string with utf-8 encoding
+            if (isBinary) {
+                res.end(content);
+            } else {
+                res.end(content, 'utf-8');
+            }
         }
     });
 });

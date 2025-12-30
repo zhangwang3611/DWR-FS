@@ -34,7 +34,7 @@ async function log(level, message, data = null) {
         const encodedOperator = btoa(unescape(encodeURIComponent(operatorName)));
         // 使用Headers对象设置请求头，确保中文字符正确传递
         const headers = new Headers();
-        headers.append('Content-Type', 'application/json');
+        headers.append('Content-Type', 'application/json; charset=utf-8');
         headers.append('X-Operator', encodedOperator);
         // 发送日志到服务器
         await fetch('/api/log', {
@@ -272,6 +272,12 @@ window.onclick = function(event) {
     if (todayProgressModal && event.target === todayProgressModal) {
         todayProgressModal.style.display = 'none';
     }
+    
+    // 其他成员已填写日志弹窗
+    const otherMemberReportsModal = document.getElementById('otherMemberReportsModal');
+    if (otherMemberReportsModal && event.target === otherMemberReportsModal) {
+        otherMemberReportsModal.style.display = 'none';
+    }
 }
 
 // 成员页面初始化
@@ -370,9 +376,25 @@ async function toggleReportType() {
     const dailyContent = document.getElementById('dailyContent');
     const weeklyContent = document.getElementById('weeklyContent');
     
+    await log('info', '切换报告类型', { 
+        newReportType: reportType,
+        dailyBlocked: window.dailyReportsBlocked || false,
+        weeklyBlocked: window.weeklyReportsBlocked || false
+    });
+    
+    // 检查切换到的报告类型是否被禁用
+    if (reportType === 'daily' && window.dailyReportsBlocked) {
+        await log('info', '尝试切换到日报，但日报被其他成员包含');
+        // 允许切换，但会禁用表单
+    } else if (reportType === 'weekly' && window.weeklyReportsBlocked) {
+        await log('info', '尝试切换到周报，但周报被其他成员包含');
+        // 允许切换，但会禁用表单
+    }
+    
     if (reportType === 'weekly') {
         const dailyDone = await hasTodayDailyReport();
-        if (!dailyDone) {
+        // 只有在日报未被禁用且未填写时，才要求先填写日报
+        if (!dailyDone && !window.dailyReportsBlocked) {
             showAlertModal('请先填写当日的日报。');
             // 恢复选择为日报
             reportTypeSelect.value = 'daily';
@@ -401,7 +423,38 @@ async function toggleReportType() {
     document.getElementById('reportId').value = '';
     
     // 切换报告类型后，重新加载对应类型的报告数据
-    loadMemberReport();
+    await loadMemberReport();
+    
+    // 获取成员列表用于显示姓名
+    let allMembers = [];
+    try {
+        allMembers = await getFromLocalStorage('members', []);
+    } catch (error) {
+        await log('warn', '获取成员列表失败，使用空数组', { error: error.message });
+    }
+    
+    // 根据切换后的报告类型，显示提示信息（但不阻止填写）
+    if (reportType === 'daily' && window.dailyReportsBlocked) {
+        await showOtherMemberReportsModal(window.blockedDailyReports || [], allMembers);
+        showInfoNotice('daily', (window.blockedDailyReports || []).length);
+        await enableReportForm();
+    } else if (reportType === 'weekly' && window.weeklyReportsBlocked) {
+        await showOtherMemberReportsModal(window.blockedWeeklyReports || [], allMembers);
+        showInfoNotice('weekly', (window.blockedWeeklyReports || []).length);
+        await enableReportForm();
+    } else {
+        // 移除可能存在的提示信息
+        const reportForm = document.getElementById('reportForm');
+        if (reportForm) {
+            const infoNotice = reportForm.querySelector('.info-notice');
+            if (infoNotice) {
+                infoNotice.remove();
+            }
+        }
+        // 移除当前日期后面的按钮
+        removeViewReportsButton();
+        await enableReportForm();
+    }
 }
 
 // 统计日报弹窗
@@ -1022,7 +1075,7 @@ async function saveDataToServer(key, data) {
         const encodedOperator = btoa(unescape(encodeURIComponent(operatorName)));
         // 使用Headers对象设置请求头，确保中文字符正确传递
         const headers = new Headers();
-        headers.append('Content-Type', 'application/json');
+        headers.append('Content-Type', 'application/json; charset=utf-8');
         headers.append('X-Operator', encodedOperator);
         const response = await fetch(`${CONFIG.API_BASE_URL}${key}`, {
             method: 'POST',
@@ -2090,9 +2143,18 @@ async function loadMemberReport() {
     await log('info', 'loadMemberReport函数开始执行');
     
     // 从sessionStorage获取当前成员信息
-    const memberStr = sessionStorage.getItem('currentMember');
-    let currentMember = memberStr ? JSON.parse(memberStr) : null;
-    let currentEmployeeId = currentMember ? currentMember.employeeId : null;
+    let currentMember = null;
+    let currentEmployeeId = null;
+    try {
+        const memberStr = sessionStorage.getItem('currentMember');
+        if (memberStr) {
+            currentMember = JSON.parse(memberStr);
+            currentEmployeeId = currentMember ? currentMember.employeeId : null;
+        }
+    } catch (error) {
+        await log('warn', '解析当前成员信息失败，继续执行', { error: error.message });
+        // 解析失败不影响后续流程，继续执行
+    }
     
     // 获取成员名称（可能从页面或currentMember中获取）
     const memberName = document.getElementById('memberName').value;
@@ -2106,10 +2168,24 @@ async function loadMemberReport() {
     
     try {
         // 获取所有报告数据
-        const reports = await getFromLocalStorage('reports', []);
+        let reports;
+        try {
+            reports = await getFromLocalStorage('reports', []);
+        } catch (error) {
+            await log('error', '获取报告数据失败', { error: error });
+            // 如果获取数据失败，使用空数组继续执行，不显示错误提示
+            reports = [];
+        }
         
         // 获取所有成员数据，用于备用查找
-        const allMembers = await getFromLocalStorage('members', []);
+        let allMembers;
+        try {
+            allMembers = await getFromLocalStorage('members', []);
+        } catch (error) {
+            await log('error', '获取成员数据失败', { error: error });
+            // 如果获取数据失败，使用空数组继续执行，不显示错误提示
+            allMembers = [];
+        }
         
         // 如果没有currentEmployeeId但有memberName，尝试通过memberName获取employeeId
         if (!currentEmployeeId && memberName) {
@@ -2190,6 +2266,9 @@ async function loadMemberReport() {
         if (todayReport) {
             await log('info', '找到当天报告，开始填充数据', { reportId: todayReport.id, reportType: todayReport.type });
             
+            // 启用表单（以防之前被禁用）
+            enableReportForm();
+            
             // 设置报告ID
             document.getElementById('reportId').value = todayReport.id;
             
@@ -2237,14 +2316,727 @@ async function loadMemberReport() {
 
         } else {
             await log('info', '未找到当天报告数据，清空表单内容', { memberName: memberName, date: today });
-            // 没有找到报告，清空表单（除了姓名）
-            clearFormExceptName();
-            // 注意：这里不清空reportId，让保存时自动生成新ID
+            
+            // 分别检查日报和周报是否有其他成员包含了当前成员
+            const currentReportType = document.getElementById('reportType').value;
+            
+            await log('info', '开始检查是否有其他成员在日志中包含了当前成员', { 
+                memberName: memberName, 
+                employeeId: currentEmployeeId, 
+                date: today
+            });
+            
+            // 检查日报
+            const dailyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
+                reports, 
+                today, 
+                'daily', 
+                currentEmployeeId, 
+                memberName,
+                allMembers
+            );
+            
+            // 检查周报
+            const weeklyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
+                reports, 
+                today, 
+                'weekly', 
+                currentEmployeeId, 
+                memberName,
+                allMembers
+            );
+            
+            // 确保返回值是数组
+            const safeDailyList = Array.isArray(dailyReportsWithCurrentMember) ? dailyReportsWithCurrentMember : [];
+            const safeWeeklyList = Array.isArray(weeklyReportsWithCurrentMember) ? weeklyReportsWithCurrentMember : [];
+            
+            // 存储检查结果到全局变量，供切换报告类型时使用
+            window.dailyReportsBlocked = safeDailyList.length > 0;
+            window.weeklyReportsBlocked = safeWeeklyList.length > 0;
+            window.blockedDailyReports = safeDailyList;
+            window.blockedWeeklyReports = safeWeeklyList;
+            
+            await log('info', '检查结果', {
+                dailyBlocked: window.dailyReportsBlocked,
+                weeklyBlocked: window.weeklyReportsBlocked,
+                dailyReportsCount: safeDailyList.length,
+                weeklyReportsCount: safeWeeklyList.length
+            });
+            
+            // 如果发现其他成员在日志中包含了当前成员，显示提示信息（但不阻止填写）
+            if (currentReportType === 'daily' && window.dailyReportsBlocked) {
+                await log('info', '发现其他成员在日报中包含了当前成员，显示提示信息', { 
+                    reportsCount: safeDailyList.length
+                });
+                // 显示提示弹窗，但不禁用表单
+                await showOtherMemberReportsModal(safeDailyList, allMembers);
+                // 显示提示信息，但允许填写
+                showInfoNotice('daily', safeDailyList.length);
+                // 确保表单可用
+                enableReportForm();
+            } else if (currentReportType === 'weekly' && window.weeklyReportsBlocked) {
+                await log('info', '发现其他成员在周报中包含了当前成员，显示提示信息', { 
+                    reportsCount: safeWeeklyList.length
+                });
+                // 显示提示弹窗，但不禁用表单
+                await showOtherMemberReportsModal(safeWeeklyList, allMembers);
+                // 显示提示信息，但允许填写
+                showInfoNotice('weekly', safeWeeklyList.length);
+                // 确保表单可用
+                enableReportForm();
+            } else {
+                await log('info', '当前报告类型未被其他成员包含，正常填写', { 
+                    reportType: currentReportType,
+                    dailyBlocked: window.dailyReportsBlocked,
+                    weeklyBlocked: window.weeklyReportsBlocked
+                });
+                
+                // 没有找到报告，清空表单（除了姓名）
+                clearFormExceptName();
+                // 注意：这里不清空reportId，让保存时自动生成新ID
+                enableReportForm();
+            }
         }
     } catch (error) {
-        await log('error', '加载报告数据失败', { error: error });
-        alert('加载报告数据失败，请重试');
+        // 只有在真正的异常情况下才显示错误提示
+        // 比如：JSON解析失败、DOM操作失败等
+        await log('error', '加载报告数据时发生异常', { 
+            error: error, 
+            errorMessage: error.message,
+            errorStack: error.stack 
+        });
+        
+        // 检查是否是预期的错误（比如未找到报告不应该显示错误）
+        // 只有在非预期的错误时才显示提示
+        const isExpectedError = error.message && (
+            error.message.includes('未找到') || 
+            error.message.includes('not found') ||
+            error.message.includes('空数组')
+        );
+        
+        if (!isExpectedError) {
+            // 只有在真正的异常情况下才显示错误提示
+            await log('warn', '显示错误提示给用户', { error: error.message });
+            alert('加载报告数据失败，请重试');
+        } else {
+            await log('info', '忽略预期的错误，不显示错误提示', { error: error.message });
+        }
     }
+}
+
+// 检查是否有其他成员在日志中包含了当前成员
+async function checkIfMemberIncludedInOtherReports(reports, date, reportType, currentEmployeeId, currentMemberName, allMembers) {
+    await log('debug', 'checkIfMemberIncludedInOtherReports 开始执行', {
+        date: date,
+        reportType: reportType,
+        currentEmployeeId: currentEmployeeId,
+        currentMemberName: currentMemberName,
+        totalReports: reports.length
+    });
+    
+    const matchingReports = [];
+    
+    // 获取当前成员的 employeeId 和 name（用于匹配）
+    let targetEmployeeId = currentEmployeeId;
+    let targetMemberName = currentMemberName;
+    
+    // 如果当前成员没有 employeeId，尝试从 allMembers 中查找
+    if (!targetEmployeeId && targetMemberName) {
+        await log('debug', '当前成员没有 employeeId，尝试从成员列表中查找', { memberName: targetMemberName });
+        const trimmedName = targetMemberName.trim().replace(/\s+/g, '');
+        const matchedMember = allMembers.find(m => 
+            m.name.trim().replace(/\s+/g, '') === trimmedName
+        );
+        if (matchedMember) {
+            targetEmployeeId = matchedMember.employeeId;
+            await log('debug', '通过成员名称找到 employeeId', { 
+                memberName: targetMemberName, 
+                employeeId: targetEmployeeId 
+            });
+        } else {
+            await log('warn', '未能在成员列表中找到匹配的 employeeId', { memberName: targetMemberName });
+        }
+    }
+    
+    await log('debug', '开始检查报告，目标成员信息', {
+        targetEmployeeId: targetEmployeeId,
+        targetMemberName: targetMemberName
+    });
+    
+    // 检查 reports 是否为数组
+    if (!Array.isArray(reports)) {
+        await log('warn', 'reports 不是数组，返回空数组', { reports: reports });
+        return [];
+    }
+    
+    // 遍历当天的所有报告（使用 for...of 以支持 await）
+    for (let index = 0; index < reports.length; index++) {
+        const report = reports[index];
+        // 检查日期和类型是否匹配
+        if (report.date !== date || report.type !== reportType) {
+            continue; // 跳过不匹配的报告，继续下一个
+        }
+        
+        await log('debug', `检查报告 ${index + 1}`, {
+            reportId: report.id,
+            reportMemberName: report.memberName,
+            reportEmployeeId: report.employeeId,
+            reportDate: report.date,
+            reportType: report.type
+        });
+        
+        // 检查是否是当前成员自己填写的报告（如果是，跳过）
+        const reportEmployeeIdStr = report.employeeId ? String(report.employeeId) : null;
+        const targetEmployeeIdStr = targetEmployeeId ? String(targetEmployeeId) : null;
+        const isOwnReport = (reportEmployeeIdStr && targetEmployeeIdStr && reportEmployeeIdStr === targetEmployeeIdStr) ||
+                            (report.memberName === targetMemberName);
+        
+        if (isOwnReport) {
+            await log('debug', '跳过自己的报告', { reportId: report.id });
+            continue; // 跳过自己的报告，继续下一个
+        }
+        
+        // 检查报告的内容项中是否包含当前成员
+        let isIncluded = false;
+        let matchedSection = null; // 记录匹配的章节
+        
+        await log('debug', '开始检查报告内容项是否包含当前成员', { reportId: report.id });
+        
+        // 检查日报的内容项
+        if (report.type === 'daily') {
+            const todayProgress = Array.isArray(report.todayProgress) ? report.todayProgress : [];
+            const tomorrowPlan = Array.isArray(report.tomorrowPlan) ? report.tomorrowPlan : [];
+            
+            // 检查今日进展
+            for (const item of todayProgress) {
+                if (item.members && Array.isArray(item.members)) {
+                    // 检查 employeeId（转换为字符串比较）
+                    if (targetEmployeeId) {
+                        const targetEmployeeIdStr = String(targetEmployeeId);
+                        if (item.members.some(m => String(m) === targetEmployeeIdStr)) {
+                            isIncluded = true;
+                            break;
+                        }
+                    }
+                    // 也检查 memberName（兼容旧数据）
+                    if (targetMemberName && !isIncluded) {
+                        if (item.members.some(m => {
+                            if (typeof m === 'string') {
+                                const trimmedM = m.trim().replace(/\s+/g, '');
+                                const trimmedName = targetMemberName.trim().replace(/\s+/g, '');
+                                return trimmedM === trimmedName || trimmedM.includes(trimmedName) || trimmedName.includes(trimmedM);
+                            }
+                            return false;
+                        })) {
+                            isIncluded = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 检查明日计划
+            if (!isIncluded) {
+                for (const item of tomorrowPlan) {
+                    if (item.members && Array.isArray(item.members)) {
+                        // 检查 employeeId（转换为字符串比较）
+                        if (targetEmployeeId) {
+                            const targetEmployeeIdStr = String(targetEmployeeId);
+                            if (item.members.some(m => String(m) === targetEmployeeIdStr)) {
+                                isIncluded = true;
+                                break;
+                            }
+                        }
+                        // 也检查 memberName（兼容旧数据）
+                        if (targetMemberName && !isIncluded) {
+                            if (item.members.some(m => {
+                                if (typeof m === 'string') {
+                                    const trimmedM = m.trim().replace(/\s+/g, '');
+                                    const trimmedName = targetMemberName.trim().replace(/\s+/g, '');
+                                    return trimmedM === trimmedName || trimmedM.includes(trimmedName) || trimmedName.includes(trimmedM);
+                                }
+                                return false;
+                            })) {
+                                isIncluded = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (report.type === 'weekly') {
+            // 检查周报的内容项
+            const weeklyDone = Array.isArray(report.weeklyDone) ? report.weeklyDone : [];
+            const weeklyPlan = Array.isArray(report.weeklyPlan) ? report.weeklyPlan : [];
+            
+            // 检查本周完成工作
+            for (const item of weeklyDone) {
+                if (item.members && Array.isArray(item.members)) {
+                    // 检查 employeeId（转换为字符串比较）
+                    if (targetEmployeeId) {
+                        const targetEmployeeIdStr = String(targetEmployeeId);
+                        const matched = item.members.some(m => String(m) === targetEmployeeIdStr);
+                        if (matched) {
+                            isIncluded = true;
+                            matchedSection = 'weeklyDone';
+                            await log('debug', '在本周完成工作中找到匹配的 employeeId', {
+                                reportId: report.id,
+                                itemContent: item.content,
+                                itemProject: item.project,
+                                matchedEmployeeId: targetEmployeeIdStr
+                            });
+                            break;
+                        }
+                    }
+                    // 也检查 memberName（兼容旧数据）
+                    if (targetMemberName && !isIncluded) {
+                        const matched = item.members.some(m => {
+                            if (typeof m === 'string') {
+                                const trimmedM = m.trim().replace(/\s+/g, '');
+                                const trimmedName = targetMemberName.trim().replace(/\s+/g, '');
+                                return trimmedM === trimmedName || trimmedM.includes(trimmedName) || trimmedName.includes(trimmedM);
+                            }
+                            return false;
+                        });
+                        if (matched) {
+                            isIncluded = true;
+                            matchedSection = 'weeklyDone';
+                            await log('debug', '在本周完成工作中找到匹配的 memberName', {
+                                reportId: report.id,
+                                itemContent: item.content,
+                                itemProject: item.project,
+                                matchedMemberName: targetMemberName
+                            });
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // 检查下周工作计划
+            if (!isIncluded) {
+                for (const item of weeklyPlan) {
+                    if (item.members && Array.isArray(item.members)) {
+                        // 检查 employeeId（转换为字符串比较）
+                        if (targetEmployeeId) {
+                            const targetEmployeeIdStr = String(targetEmployeeId);
+                            const matched = item.members.some(m => String(m) === targetEmployeeIdStr);
+                            if (matched) {
+                                isIncluded = true;
+                                matchedSection = 'weeklyPlan';
+                                await log('debug', '在下周工作计划中找到匹配的 employeeId', {
+                                    reportId: report.id,
+                                    itemContent: item.content,
+                                    itemProject: item.project,
+                                    matchedEmployeeId: targetEmployeeIdStr
+                                });
+                                break;
+                            }
+                        }
+                        // 也检查 memberName（兼容旧数据）
+                        if (targetMemberName && !isIncluded) {
+                            const matched = item.members.some(m => {
+                                if (typeof m === 'string') {
+                                    const trimmedM = m.trim().replace(/\s+/g, '');
+                                    const trimmedName = targetMemberName.trim().replace(/\s+/g, '');
+                                    return trimmedM === trimmedName || trimmedM.includes(trimmedName) || trimmedName.includes(trimmedM);
+                                }
+                                return false;
+                            });
+                            if (matched) {
+                                isIncluded = true;
+                                matchedSection = 'weeklyPlan';
+                                await log('debug', '在下周工作计划中找到匹配的 memberName', {
+                                    reportId: report.id,
+                                    itemContent: item.content,
+                                    itemProject: item.project,
+                                    matchedMemberName: targetMemberName
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (isIncluded) {
+            matchingReports.push(report);
+            await log('info', '找到包含当前成员的报告', {
+                reportId: report.id,
+                reportMemberName: report.memberName,
+                reportEmployeeId: report.employeeId,
+                matchedSection: matchedSection,
+                reportDate: report.date,
+                reportType: report.type
+            });
+        } else {
+            await log('debug', '报告不包含当前成员', { reportId: report.id });
+        }
+    }
+    
+    await log('info', '检查完成，找到包含当前成员的报告数量', {
+        totalReports: reports.length,
+        matchingReportsCount: matchingReports.length,
+        matchingReportIds: matchingReports.map(r => r.id)
+    });
+    
+    return matchingReports;
+}
+
+// 显示其他成员已填写日志弹窗
+async function showOtherMemberReportsModal(reports, allMembers) {
+    await log('info', '开始显示其他成员已填写日志弹窗', { reportsCount: reports.length });
+    
+    const modal = document.getElementById('otherMemberReportsModal');
+    const listContainer = document.getElementById('otherMemberReportsList');
+    
+    if (!modal || !listContainer) {
+        await log('error', '无法找到弹窗元素', { 
+            modalExists: !!modal, 
+            listContainerExists: !!listContainer 
+        });
+        return;
+    }
+    
+    // 清空列表
+    listContainer.innerHTML = '';
+    
+    // 辅助函数：根据员工ID获取姓名
+    const getMemberNameById = (employeeId) => {
+        if (!employeeId) return '未知';
+        // 确保 employeeId 是字符串类型进行比较
+        const employeeIdStr = String(employeeId);
+        const member = allMembers.find(m => {
+            if (!m || !m.employeeId) return false;
+            return String(m.employeeId) === employeeIdStr;
+        });
+        return member ? member.name : employeeIdStr;
+    };
+    
+    // 辅助函数：构建单个工作项的HTML
+    const buildWorkItemHTML = (item) => {
+        let itemHTML = `项目: ${item.project || '未选择项目'} - ${item.content || item}`;
+        if (item.progress !== undefined) {
+            itemHTML += `，已完成${item.progress}%`;
+        }
+        if (item.members && item.members.length > 0) {
+            const memberNames = item.members.map(id => getMemberNameById(id));
+            itemHTML += ` —— ${memberNames.join('、')}`;
+        }
+        return itemHTML;
+    };
+    
+    // 为每个报告创建列表项
+    reports.forEach((report, index) => {
+        const reportItem = document.createElement('div');
+        reportItem.className = 'other-member-report-item';
+        reportItem.style.cssText = 'margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;';
+        
+        let contentHTML = '';
+        
+        if (report.type === 'daily') {
+            const todayProgress = Array.isArray(report.todayProgress) ? report.todayProgress : [];
+            const tomorrowPlan = Array.isArray(report.tomorrowPlan) ? report.tomorrowPlan : [];
+            
+            contentHTML = `
+                <div style="margin-bottom: 10px;">
+                    <strong>填写人：</strong>${report.memberName || '未知'} 
+                    <span style="margin-left: 15px;"><strong>日期：</strong>${report.date}</span>
+                    <span style="margin-left: 15px;"><strong>类型：</strong>日报</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>今日进展：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${todayProgress.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}
+                    </ul>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>明日计划：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${tomorrowPlan.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+            const weeklyDone = Array.isArray(report.weeklyDone) ? report.weeklyDone : [];
+            const weeklyPlan = Array.isArray(report.weeklyPlan) ? report.weeklyPlan : [];
+            
+            contentHTML = `
+                <div style="margin-bottom: 10px;">
+                    <strong>填写人：</strong>${report.memberName || '未知'} 
+                    <span style="margin-left: 15px;"><strong>日期：</strong>${report.date}</span>
+                    <span style="margin-left: 15px;"><strong>类型：</strong>周报</span>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>本周完成工作：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${weeklyDone.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}
+                    </ul>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>下周工作计划：</strong>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${weeklyPlan.map(item => `<li>${buildWorkItemHTML(item)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        
+        reportItem.innerHTML = contentHTML;
+        listContainer.appendChild(reportItem);
+    });
+    
+    // 显示弹窗
+    modal.style.display = 'block';
+}
+
+// 关闭其他成员已填写日志弹窗
+async function closeOtherMemberReportsModal() {
+    await log('info', '关闭其他成员已填写日志弹窗');
+    const modal = document.getElementById('otherMemberReportsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// 显示信息提示（不阻止填写）
+function showInfoNotice(reportType, reportsCount) {
+    const reportForm = document.getElementById('reportForm');
+    if (!reportForm) {
+        return;
+    }
+    
+    // 移除旧的提示信息
+    const oldNotice = reportForm.querySelector('.info-notice');
+    if (oldNotice) {
+        oldNotice.remove();
+    }
+    
+    // 移除旧的按钮（如果存在）
+    const oldBtn = document.getElementById('viewOtherMemberReportsBtn');
+    if (oldBtn) {
+        oldBtn.remove();
+    }
+    
+    // 在当前日期后面添加小按钮
+    const currentDateDisplay = document.getElementById('currentDateDisplay');
+    if (currentDateDisplay) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-secondary';
+        button.id = 'viewOtherMemberReportsBtn';
+        button.style.cssText = 'margin-left: 10px; padding: 3px 8px; font-size: 12px; white-space: nowrap; cursor: pointer; background-color: #2196F3; color: white; border: none; border-radius: 3px; font-weight: normal; line-height: 1.2;';
+        button.textContent = `查看(${reportsCount})`;
+        button.title = `查看包含我的${reportType === 'daily' ? '日报' : '周报'}`;
+        button.onclick = async () => {
+            await openOtherMemberReportsModal(reportType);
+        };
+        
+        // 将按钮插入到当前日期后面
+        if (currentDateDisplay.nextSibling) {
+            currentDateDisplay.parentNode.insertBefore(button, currentDateDisplay.nextSibling);
+        } else {
+            currentDateDisplay.parentNode.appendChild(button);
+        }
+    }
+    
+    // 添加提示信息（信息性提示，不阻止填写）
+    const formHeader = reportForm.querySelector('.form-group.inline-group');
+    if (formHeader) {
+        const notice = document.createElement('div');
+        notice.className = 'info-notice';
+        notice.style.cssText = 'color: #2196F3; font-weight: bold; margin-top: 10px; padding: 10px; background-color: #E3F2FD; border: 1px solid #2196F3; border-radius: 5px;';
+        notice.innerHTML = `ℹ️ 提示：有 ${reportsCount} 位其他成员在${reportType === 'daily' ? '日报' : '周报'}中将您添加为成员。您仍可以正常填写自己的${reportType === 'daily' ? '日报' : '周报'}。`;
+        formHeader.appendChild(notice);
+    }
+}
+
+
+// 重新打开其他成员已填写日志弹窗
+async function openOtherMemberReportsModal(reportType) {
+    await log('info', '重新打开其他成员已填写日志弹窗', { reportType: reportType });
+    
+    // 获取成员列表
+    let allMembers = [];
+    try {
+        allMembers = await getFromLocalStorage('members', []);
+    } catch (error) {
+        await log('warn', '获取成员列表失败，使用空数组', { error: error.message });
+    }
+    
+    // 根据报告类型获取对应的报告列表
+    let reports = [];
+    if (reportType === 'daily') {
+        reports = window.blockedDailyReports || [];
+    } else if (reportType === 'weekly') {
+        reports = window.blockedWeeklyReports || [];
+    }
+    
+    if (reports.length === 0) {
+        await log('warn', '没有找到对应的报告列表', { reportType: reportType });
+        return;
+    }
+    
+    // 显示弹窗
+    await showOtherMemberReportsModal(reports, allMembers);
+}
+
+// 根据报告类型禁用表单（保留此函数以防将来需要）
+async function disableReportFormForType(reportType) {
+    await log('info', `开始禁用${reportType === 'daily' ? '日报' : '周报'}表单`, { reportType: reportType });
+    const reportForm = document.getElementById('reportForm');
+    if (!reportForm) {
+        await log('error', '无法找到报告表单元素');
+        return;
+    }
+    
+    // 根据报告类型禁用对应的内容区域
+    if (reportType === 'daily') {
+        const dailyContent = document.getElementById('dailyContent');
+        if (dailyContent) {
+            const inputs = dailyContent.querySelectorAll('input, select, textarea, button');
+            inputs.forEach(input => {
+                if (input.classList.contains('btn-add') || input.classList.contains('btn-remove')) {
+                    input.disabled = true;
+                    input.style.opacity = '0.5';
+                    input.style.cursor = 'not-allowed';
+                } else if (!input.id || input.id !== 'memberName') {
+                    input.disabled = true;
+                }
+            });
+        }
+    } else if (reportType === 'weekly') {
+        const weeklyContent = document.getElementById('weeklyContent');
+        if (weeklyContent) {
+            const inputs = weeklyContent.querySelectorAll('input, select, textarea, button');
+            inputs.forEach(input => {
+                if (input.classList.contains('btn-add') || input.classList.contains('btn-remove')) {
+                    input.disabled = true;
+                    input.style.opacity = '0.5';
+                    input.style.cursor = 'not-allowed';
+                } else if (!input.id || input.id !== 'memberName') {
+                    input.disabled = true;
+                }
+            });
+        }
+    }
+    
+    // 禁用保存按钮
+    const saveButton = reportForm.querySelector('.btn-save');
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.style.opacity = '0.5';
+        saveButton.style.cursor = 'not-allowed';
+    }
+    
+    // 添加提示信息
+    const formHeader = reportForm.querySelector('.form-group.inline-group');
+    if (formHeader && !formHeader.querySelector('.disabled-notice')) {
+        const notice = document.createElement('div');
+        notice.className = 'disabled-notice';
+        notice.style.cssText = 'color: #ff6b6b; font-weight: bold; margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;';
+        notice.textContent = `⚠️ 其他成员已在${reportType === 'daily' ? '日报' : '周报'}中包含您，您无法填写当天的${reportType === 'daily' ? '日报' : '周报'}。`;
+        formHeader.appendChild(notice);
+    }
+    
+    await log('info', `${reportType === 'daily' ? '日报' : '周报'}表单已禁用`);
+}
+
+// 禁用报告表单（兼容旧代码）
+async function disableReportForm() {
+    await log('info', '开始禁用报告表单');
+    const reportForm = document.getElementById('reportForm');
+    if (!reportForm) {
+        await log('error', '无法找到报告表单元素');
+        return;
+    }
+    
+    // 禁用所有输入元素
+    const inputs = reportForm.querySelectorAll('input, select, textarea, button');
+    inputs.forEach(input => {
+        if (input.id !== 'memberName') { // 保留成员姓名输入框可用
+            input.disabled = true;
+        }
+    });
+    
+    // 禁用所有添加按钮
+    const addButtons = reportForm.querySelectorAll('.btn-add');
+    addButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+    });
+    
+    // 禁用保存按钮
+    const saveButton = reportForm.querySelector('.btn-save');
+    if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.style.opacity = '0.5';
+        saveButton.style.cursor = 'not-allowed';
+    }
+    
+    // 添加提示信息
+    const formHeader = reportForm.querySelector('.form-group.inline-group');
+    if (formHeader && !formHeader.querySelector('.disabled-notice')) {
+        const notice = document.createElement('div');
+        notice.className = 'disabled-notice';
+        notice.style.cssText = 'color: #ff6b6b; font-weight: bold; margin-top: 10px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px;';
+        notice.textContent = '⚠️ 其他成员已在日志中包含您，您无法填写当天的日志。';
+        formHeader.appendChild(notice);
+    }
+    
+    await log('info', '报告表单已禁用', {
+        disabledInputsCount: reportForm.querySelectorAll('input[disabled]').length,
+        disabledSelectsCount: reportForm.querySelectorAll('select[disabled]').length,
+        disabledButtonsCount: reportForm.querySelectorAll('button[disabled]').length
+    });
+}
+
+// 启用报告表单
+async function enableReportForm() {
+    await log('info', '开始启用报告表单');
+    const reportForm = document.getElementById('reportForm');
+    if (!reportForm) {
+        await log('error', '无法找到报告表单元素');
+        return;
+    }
+    
+    // 启用所有输入元素
+    const inputs = reportForm.querySelectorAll('input, select, textarea, button');
+    inputs.forEach(input => {
+        input.disabled = false;
+    });
+    
+    // 启用所有添加按钮
+    const addButtons = reportForm.querySelectorAll('.btn-add');
+    addButtons.forEach(btn => {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+    });
+    
+    // 启用保存按钮
+    const saveButton = reportForm.querySelector('.btn-save');
+    if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.style.opacity = '1';
+        saveButton.style.cursor = 'pointer';
+    }
+    
+    // 移除提示信息
+    const disabledNotice = reportForm.querySelector('.disabled-notice');
+    if (disabledNotice) {
+        disabledNotice.remove();
+    }
+    
+    // 移除信息提示（如果存在）
+    const infoNotice = reportForm.querySelector('.info-notice');
+    if (infoNotice) {
+        infoNotice.remove();
+    }
+    
+    await log('info', '报告表单已启用');
 }
 
 // 填充内容项
@@ -2416,64 +3208,187 @@ let currentPage = 1;
 let logsPerPage = 10;
 
 // 加载成员所有日志
+// 使用标志位防止重复加载
+let isLoadingLogs = false;
+
 async function loadMemberLogs() {
+    // 如果正在加载，直接返回
+    if (isLoadingLogs) {
+        return;
+    }
+    
     const memberName = document.getElementById('memberName').value;
     if (!memberName) return;
     
+    isLoadingLogs = true;
+    
     try {
+        // 从sessionStorage获取当前成员信息
+        const memberStr = sessionStorage.getItem('currentMember');
+        let currentMember = memberStr ? JSON.parse(memberStr) : null;
+        let currentEmployeeId = currentMember ? currentMember.employeeId : null;
+        
+        // 如果没有currentEmployeeId但有memberName，尝试通过memberName获取employeeId
+        if (!currentEmployeeId && memberName) {
+            const allMembers = await getFromLocalStorage('members', []);
+            const trimmedName = memberName.trim().replace(/\s+/g, '');
+            
+            // 精确匹配
+            let matchedMember = allMembers.find(m => 
+                m.name.trim().replace(/\s+/g, '') === trimmedName
+            );
+            
+            if (matchedMember) {
+                currentEmployeeId = matchedMember.employeeId;
+            }
+        }
+        
+        // 确保currentEmployeeId是字符串类型
+        currentEmployeeId = currentEmployeeId ? String(currentEmployeeId) : null;
+        
+        // 获取所有成员数据
+        const allMembers = await getFromLocalStorage('members', []);
         // 获取所有报告数据
         const reports = await getFromLocalStorage('reports', []);
         
-        // 过滤当前成员的报告
-        allLogs = reports.filter(report => report.memberName === memberName)
-                       .sort((a, b) => new Date(b.date) - new Date(a.date)); // 按日期倒序排列
+        await log('info', '开始加载成员日志，包含自己填写和其他成员包含的情况', {
+            memberName: memberName,
+            employeeId: currentEmployeeId
+        });
+        
+        // 过滤日志：包括自己填写的报告和其他成员在日志中包含当前成员的报告
+        allLogs = [];
+        
+        // 1. 先添加当前成员自己填写的报告
+        const ownReports = reports.filter(report => {
+            // 优先使用employeeId匹配
+            if (currentEmployeeId && report.employeeId) {
+                const reportEmployeeIdStr = String(report.employeeId);
+                if (reportEmployeeIdStr === currentEmployeeId) {
+                    return true;
+                }
+            }
+            // 如果没有employeeId匹配，则使用memberName匹配
+            return report.memberName === memberName;
+        });
+        
+        allLogs.push(...ownReports);
+        await log('info', '找到自己填写的报告', { count: ownReports.length });
+        
+        // 2. 查找其他成员在日志中包含当前成员的报告
+        // 获取所有唯一的日期和类型组合
+        const dateTypeSet = new Set();
+        reports.forEach(report => {
+            if (report.date && report.type) {
+                dateTypeSet.add(`${report.date}_${report.type}`);
+            }
+        });
+        
+        // 对每个日期和类型组合检查是否包含当前成员
+        for (const dateType of dateTypeSet) {
+            const [date, type] = dateType.split('_');
+            const includedReports = await checkIfMemberIncludedInOtherReports(
+                reports,
+                date,
+                type,
+                currentEmployeeId,
+                memberName,
+                allMembers
+            );
+            
+            // 添加包含当前成员的报告（排除已经添加的自己填写的报告）
+            includedReports.forEach(report => {
+                // 检查是否已经存在（避免重复）
+                const exists = allLogs.some(existing => 
+                    existing.id === report.id || 
+                    (existing.date === report.date && 
+                     existing.type === report.type && 
+                     existing.memberName === report.memberName)
+                );
+                if (!exists) {
+                    allLogs.push(report);
+                }
+            });
+        }
+        
+        await log('info', '找到其他成员包含当前成员的报告', { 
+            count: allLogs.length - ownReports.length 
+        });
+        
+        // 按日期倒序排列
+        allLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        await log('info', '日志加载完成', { 
+            totalLogs: allLogs.length,
+            ownReports: ownReports.length,
+            includedReports: allLogs.length - ownReports.length
+        });
         
         // 初始时不筛选，显示所有日志
         filteredLogs = [...allLogs];
         
+        // 重置当前页码
+        currentPage = 1;
+        
         // 渲染日志列表
-        renderLogs();
+        await renderLogs();
     } catch (error) {
         await log('error', '加载日志失败', { error: error });
         alert('加载历史日志失败，请重试');
+    } finally {
+        isLoadingLogs = false;
     }
 }
 
 // 筛选日志
-function filterLogs() {
-    const logType = document.getElementById('logTypeFilter').value;
-    const startDate = document.getElementById('startDateFilter').value;
-    const endDate = document.getElementById('endDateFilter').value;
+// 使用防抖标志防止重复执行
+let isFiltering = false;
+
+async function filterLogs() {
+    // 如果正在筛选，直接返回
+    if (isFiltering) {
+        return;
+    }
     
-    // 应用筛选条件
-    filteredLogs = allLogs.filter(log => {
-        // 类型筛选
-        if (logType !== 'all' && log.type !== logType) {
-            return false;
-        }
-        
-        // 开始日期筛选
-        if (startDate && log.date < startDate) {
-            return false;
-        }
-        
-        // 结束日期筛选
-        if (endDate && log.date > endDate) {
-            return false;
-        }
-        
-        return true;
-    });
+    isFiltering = true;
     
-    // 重置当前页码
-    currentPage = 1;
-    
-    // 重新渲染日志列表
-    renderLogs();
+    try {
+        const logType = document.getElementById('logTypeFilter').value;
+        const startDate = document.getElementById('startDateFilter').value;
+        const endDate = document.getElementById('endDateFilter').value;
+        
+        // 应用筛选条件
+        filteredLogs = allLogs.filter(log => {
+            // 类型筛选
+            if (logType !== 'all' && log.type !== logType) {
+                return false;
+            }
+            
+            // 开始日期筛选
+            if (startDate && log.date < startDate) {
+                return false;
+            }
+            
+            // 结束日期筛选
+            if (endDate && log.date > endDate) {
+                return false;
+            }
+            
+            return true;
+        });
+        
+        // 重置当前页码
+        currentPage = 1;
+        
+        // 重新渲染日志列表
+        await renderLogs();
+    } finally {
+        isFiltering = false;
+    }
 }
 
 // 重置筛选条件
-function resetFilters() {
+async function resetFilters() {
     document.getElementById('logTypeFilter').value = 'all';
     document.getElementById('startDateFilter').value = '';
     document.getElementById('endDateFilter').value = '';
@@ -2481,27 +3396,42 @@ function resetFilters() {
     // 显示所有日志
     filteredLogs = [...allLogs];
     currentPage = 1;
-    renderLogs();
+    await renderLogs();
 }
 
 // 渲染日志列表
+// 使用标志位防止重复渲染
+let isRendering = false;
+
 async function renderLogs() {
-    const logsList = document.getElementById('logsList');
-    const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-    
-    // 计算当前页的日志
-    const startIndex = (currentPage - 1) * logsPerPage;
-    const currentLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
-    
-    // 清空列表
-    logsList.innerHTML = '';
-    
-    // 如果没有日志
-    if (currentLogs.length === 0) {
-        logsList.innerHTML = '<p class="no-logs">暂无历史日志</p>';
-        updatePagination(totalPages);
+    // 如果正在渲染，直接返回
+    if (isRendering) {
         return;
     }
+    
+    isRendering = true;
+    
+    try {
+        const logsList = document.getElementById('logsList');
+        if (!logsList) {
+            return;
+        }
+        
+        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+        
+        // 计算当前页的日志
+        const startIndex = (currentPage - 1) * logsPerPage;
+        const currentLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
+        
+        // 清空列表（确保完全清空）
+        logsList.innerHTML = '';
+        
+        // 如果没有日志
+        if (currentLogs.length === 0) {
+            logsList.innerHTML = '<p class="no-logs">暂无历史日志</p>';
+            updatePagination(totalPages);
+            return;
+        }
     
     // 获取所有成员数据，用于转换员工ID为姓名
     const allMembers = await getFromLocalStorage('members', []);
@@ -2580,6 +3510,9 @@ async function renderLogs() {
     
     // 更新分页组件
     updatePagination(totalPages);
+    } finally {
+        isRendering = false;
+    }
 }
 
 // 更新分页组件
@@ -2598,19 +3531,19 @@ function updatePagination(totalPages) {
 }
 
 // 上一页
-function goToPrevPage() {
+async function goToPrevPage() {
     if (currentPage > 1) {
         currentPage--;
-        renderLogs();
+        await renderLogs();
     }
 }
 
 // 下一页
-function goToNextPage() {
+async function goToNextPage() {
     const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
     if (currentPage < totalPages) {
         currentPage++;
-        renderLogs();
+        await renderLogs();
     }
 }
 
@@ -2631,7 +3564,15 @@ function closeLogsModal() {
 }
 
 // 初始化日志相关事件监听器
+// 使用标志位防止重复初始化
+let logsInitialized = false;
+
 function initLogs() {
+    // 如果已经初始化过，直接返回
+    if (logsInitialized) {
+        return;
+    }
+    
     // 成员姓名输入变化时加载日志
     const memberNameInput = document.getElementById('memberName');
     if (memberNameInput) {
@@ -2642,15 +3583,25 @@ function initLogs() {
     const prevPageBtn = document.getElementById('prevPage');
     const nextPageBtn = document.getElementById('nextPage');
     
-    if (prevPageBtn) prevPageBtn.addEventListener('click', goToPrevPage);
-    if (nextPageBtn) nextPageBtn.addEventListener('click', goToNextPage);
+    if (prevPageBtn) {
+        prevPageBtn.addEventListener('click', goToPrevPage);
+    }
+    if (nextPageBtn) {
+        nextPageBtn.addEventListener('click', goToNextPage);
+    }
     
     // 筛选按钮事件监听
     const filterBtn = document.querySelector('.filter-controls .btn-secondary:first-of-type');
     const resetBtn = document.querySelector('.filter-controls .btn-secondary:last-of-type');
     
-    if (filterBtn) filterBtn.addEventListener('click', filterLogs);
-    if (resetBtn) resetBtn.addEventListener('click', resetFilters);
+    if (filterBtn) {
+        filterBtn.addEventListener('click', filterLogs);
+    }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetFilters);
+    }
+    
+    logsInitialized = true;
 }
 
 // 模板相关函数
