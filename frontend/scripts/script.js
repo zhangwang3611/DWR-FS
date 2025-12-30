@@ -2260,8 +2260,51 @@ async function loadMemberReport() {
             return (idMatch || nameMatch) && dateMatch && typeMatch;
         });
         
-
-
+        // 无论是否找到自己的报告，都检查是否有其他成员包含了当前成员
+        await log('info', '开始检查是否有其他成员在日志中包含了当前成员', { 
+            memberName: memberName, 
+            employeeId: currentEmployeeId, 
+            date: today,
+            hasOwnReport: !!todayReport
+        });
+        
+        // 检查日报
+        const dailyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
+            reports, 
+            today, 
+            'daily', 
+            currentEmployeeId, 
+            memberName,
+            allMembers
+        );
+        
+        // 检查周报
+        const weeklyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
+            reports, 
+            today, 
+            'weekly', 
+            currentEmployeeId, 
+            memberName,
+            allMembers
+        );
+        
+        // 确保返回值是数组
+        const safeDailyList = Array.isArray(dailyReportsWithCurrentMember) ? dailyReportsWithCurrentMember : [];
+        const safeWeeklyList = Array.isArray(weeklyReportsWithCurrentMember) ? weeklyReportsWithCurrentMember : [];
+        
+        // 存储检查结果到全局变量，供切换报告类型时使用
+        window.dailyReportsBlocked = safeDailyList.length > 0;
+        window.weeklyReportsBlocked = safeWeeklyList.length > 0;
+        window.blockedDailyReports = safeDailyList;
+        window.blockedWeeklyReports = safeWeeklyList;
+        
+        await log('info', '检查结果', {
+            dailyBlocked: window.dailyReportsBlocked,
+            weeklyBlocked: window.weeklyReportsBlocked,
+            dailyReportsCount: safeDailyList.length,
+            weeklyReportsCount: safeWeeklyList.length,
+            hasOwnReport: !!todayReport
+        });
         
         if (todayReport) {
             await log('info', '找到当天报告，开始填充数据', { reportId: todayReport.id, reportType: todayReport.type });
@@ -2313,55 +2356,23 @@ async function loadMemberReport() {
                 await fillContentItems('weeklyPlan', weeklyPlan);
             }
             
+            // 如果发现其他成员在日志中包含了当前成员，显示提示信息（但不阻止填写）
+            if (currentReportType === 'daily' && window.dailyReportsBlocked) {
+                await log('info', '发现其他成员在日报中包含了当前成员，显示提示信息', { 
+                    reportsCount: safeDailyList.length
+                });
+                // 显示提示信息，但允许填写（不显示弹窗，因为用户已经填写了自己的日志）
+                showInfoNotice('daily', safeDailyList.length);
+            } else if (currentReportType === 'weekly' && window.weeklyReportsBlocked) {
+                await log('info', '发现其他成员在周报中包含了当前成员，显示提示信息', { 
+                    reportsCount: safeWeeklyList.length
+                });
+                // 显示提示信息，但允许填写（不显示弹窗，因为用户已经填写了自己的日志）
+                showInfoNotice('weekly', safeWeeklyList.length);
+            }
 
         } else {
             await log('info', '未找到当天报告数据，清空表单内容', { memberName: memberName, date: today });
-            
-            // 分别检查日报和周报是否有其他成员包含了当前成员
-            const currentReportType = document.getElementById('reportType').value;
-            
-            await log('info', '开始检查是否有其他成员在日志中包含了当前成员', { 
-                memberName: memberName, 
-                employeeId: currentEmployeeId, 
-                date: today
-            });
-            
-            // 检查日报
-            const dailyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
-                reports, 
-                today, 
-                'daily', 
-                currentEmployeeId, 
-                memberName,
-                allMembers
-            );
-            
-            // 检查周报
-            const weeklyReportsWithCurrentMember = await checkIfMemberIncludedInOtherReports(
-                reports, 
-                today, 
-                'weekly', 
-                currentEmployeeId, 
-                memberName,
-                allMembers
-            );
-            
-            // 确保返回值是数组
-            const safeDailyList = Array.isArray(dailyReportsWithCurrentMember) ? dailyReportsWithCurrentMember : [];
-            const safeWeeklyList = Array.isArray(weeklyReportsWithCurrentMember) ? weeklyReportsWithCurrentMember : [];
-            
-            // 存储检查结果到全局变量，供切换报告类型时使用
-            window.dailyReportsBlocked = safeDailyList.length > 0;
-            window.weeklyReportsBlocked = safeWeeklyList.length > 0;
-            window.blockedDailyReports = safeDailyList;
-            window.blockedWeeklyReports = safeWeeklyList;
-            
-            await log('info', '检查结果', {
-                dailyBlocked: window.dailyReportsBlocked,
-                weeklyBlocked: window.weeklyReportsBlocked,
-                dailyReportsCount: safeDailyList.length,
-                weeklyReportsCount: safeWeeklyList.length
-            });
             
             // 如果发现其他成员在日志中包含了当前成员，显示提示信息（但不阻止填写）
             if (currentReportType === 'daily' && window.dailyReportsBlocked) {
