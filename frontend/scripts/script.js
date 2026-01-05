@@ -3680,7 +3680,7 @@ async function generateReport() {
     const generatedReportContent = document.getElementById('generatedReportContent');
     const generatedReportTitle = document.getElementById('generatedReportTitle');
     
-    generatedReportTitle.textContent = `${reportType === 'daily' ? '日报' : '周报'} - ${date}`;
+    generatedReportTitle.textContent = `${reportType === 'daily' ? '日报' : '周报'} - ${formatDateToChinese(date)}`;
     generatedReportContent.value = reportContent;
     generatedReportModal.style.display = 'block';
 }
@@ -3735,6 +3735,16 @@ function calculateDateOffsets(baseDate, daysOffset) {
     const date = new Date(baseDate);
     date.setDate(date.getDate() + daysOffset);
     return date.toISOString().split('T')[0];
+}
+
+// 格式化日期为中文格式：2025年12月31日
+function formatDateToChinese(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    return `${year}年${month}月${day}日`;
 }
 
 // 生成日报报告（按项目分类格式）
@@ -3882,12 +3892,15 @@ async function generateDailyReport(reports, date, template) {
     if (template && typeof template === 'string') {
         reportContent = template;
         
-        // 计算并替换日期变量
+        // 计算并替换日期变量（使用中文格式）
         const yesterday = calculateDateOffsets(date, -1);
         const tomorrow = calculateDateOffsets(date, 1);
-        reportContent = reportContent.replace(/{date}/g, date);
-        reportContent = reportContent.replace(/{yesterday}/g, yesterday);
-        reportContent = reportContent.replace(/{tomorrow}/g, tomorrow);
+        const formattedDate = formatDateToChinese(date);
+        const formattedYesterday = formatDateToChinese(yesterday);
+        const formattedTomorrow = formatDateToChinese(tomorrow);
+        reportContent = reportContent.replace(/{date}/g, formattedDate);
+        reportContent = reportContent.replace(/{yesterday}/g, formattedYesterday);
+        reportContent = reportContent.replace(/{tomorrow}/g, formattedTomorrow);
         
         // 生成今日进展部分
         let todayProgressText = '';
@@ -3924,7 +3937,7 @@ async function generateDailyReport(reports, date, template) {
         reportContent = reportContent.replace(/{tomorrowPlan}/g, tomorrowPlanText);
     } else {
         // 默认模板
-        reportContent = `${date} 日报\n\n`;
+        reportContent = `${formatDateToChinese(date)} 日报\n\n`;
         
         // 今日进展
         reportContent += '二、今日进展：\n';
@@ -4115,12 +4128,15 @@ async function generateWeeklyReport(reports, date, template) {
     
     reportContent = validTemplate;
     
-    // 替换模板变量
+    // 替换模板变量（使用中文格式）
     const yesterday = calculateDateOffsets(date, -1);
     const tomorrow = calculateDateOffsets(date, 1);
-    reportContent = reportContent.replace(/{date}/g, date);
-    reportContent = reportContent.replace(/{yesterday}/g, yesterday);
-    reportContent = reportContent.replace(/{tomorrow}/g, tomorrow);
+    const formattedDate = formatDateToChinese(date);
+    const formattedYesterday = formatDateToChinese(yesterday);
+    const formattedTomorrow = formatDateToChinese(tomorrow);
+    reportContent = reportContent.replace(/{date}/g, formattedDate);
+    reportContent = reportContent.replace(/{yesterday}/g, formattedYesterday);
+    reportContent = reportContent.replace(/{tomorrow}/g, formattedTomorrow);
     
     // 生成本周完成工作部分
     let weeklyDoneText = '';
