@@ -1906,9 +1906,18 @@ function resetContentContainer(containerId) {
 function initCustomMemberDropdown(selectElement) {
     if (!selectElement || !selectElement.classList.contains('custom-select')) return;
     
+    // 检查是否已经初始化过（避免重复绑定）
+    if (selectElement.dataset.initialized === 'true') {
+        return;
+    }
+    
     const trigger = selectElement.querySelector('.select-trigger');
     const dropdown = selectElement.querySelector('.select-dropdown');
-    const options = selectElement.querySelectorAll('.dropdown-option');
+    const dropdownContent = selectElement.querySelector('.dropdown-content');
+    
+    if (!trigger || !dropdown || !dropdownContent) {
+        return;
+    }
     
     // 点击触发按钮显示/隐藏下拉框
     trigger.addEventListener('click', (e) => {
@@ -1916,23 +1925,34 @@ function initCustomMemberDropdown(selectElement) {
         toggleDropdown(selectElement);
     });
     
-    // 点击选项选择成员
-    options.forEach(option => {
-        option.addEventListener('click', (e) => {
+    // 使用事件委托处理选项点击（这样动态添加的选项也能工作）
+    dropdownContent.addEventListener('click', (e) => {
+        const option = e.target.closest('.dropdown-option');
+        if (option) {
             e.stopPropagation();
             handleMemberSelect(selectElement, option);
-        });
-    });
-    
-    // 点击页面其他地方关闭下拉框
-    document.addEventListener('click', () => {
-        closeAllDropdowns();
+        }
     });
     
     // 阻止下拉框内部点击事件冒泡
     dropdown.addEventListener('click', (e) => {
         e.stopPropagation();
     });
+    
+    // 标记为已初始化
+    selectElement.dataset.initialized = 'true';
+}
+
+// 全局点击事件处理（统一处理所有下拉框的关闭）
+if (!window.dropdownCloseHandlerInitialized) {
+    document.addEventListener('click', (e) => {
+        // 如果点击的不是任何下拉框或其子元素，则关闭所有下拉框
+        const clickedDropdown = e.target.closest('.custom-select');
+        if (!clickedDropdown) {
+            closeAllDropdowns();
+        }
+    });
+    window.dropdownCloseHandlerInitialized = true;
 }
 
 // 切换下拉框显示/隐藏
@@ -1980,11 +2000,8 @@ function handleMemberSelect(selectElement, option) {
     // 重新渲染选中的标签
     renderSelectedTags(selectElement, selectedIds);
     
-    // 保持下拉框打开状态
-    const dropdown = selectElement.querySelector('.select-dropdown');
-    if (dropdown) {
-        dropdown.style.display = 'block';
-    }
+    // 不强制保持下拉框打开，允许用户关闭
+    // 如果需要保持打开，可以通过点击触发器重新打开
 }
 
 // 渲染选中的成员标签
@@ -1998,16 +2015,40 @@ function renderSelectedTags(selectElement, selectedIds) {
     
     // 生成新标签
     selectedIds.forEach(employeeId => {
-        const option = Array.from(options).find(opt => opt.dataset.employeeId === employeeId);
+        // 先尝试从选项中找到成员
+        let option = Array.from(options).find(opt => opt.dataset.employeeId === employeeId);
+        let name = null;
+        
         if (option) {
-            const name = option.dataset.name;
+            name = option.dataset.name;
+        } else {
+            // 如果选项还没加载，尝试从localStorage获取成员信息
+            try {
+                const membersStr = localStorage.getItem('members');
+                if (membersStr) {
+                    const members = JSON.parse(membersStr);
+                    const member = members.find(m => m.employeeId === employeeId);
+                    if (member) {
+                        name = member.name;
+                    }
+                }
+            } catch (e) {
+                // 忽略解析错误
+            }
             
+            // 如果都找不到，使用ID作为显示名称
+            if (!name) {
+                name = employeeId;
+            }
+        }
+        
+        if (name) {
             // 创建标签元素
             const tag = document.createElement('div');
             tag.className = 'selected-tag';
             tag.dataset.employeeId = employeeId;
             tag.innerHTML = `
-                ${name}
+                ${escapeHtml(name)}
                 <span class="tag-remove" onclick="removeTag(event, this)">×</span>
             `;
             
@@ -2146,7 +2187,7 @@ async function loadMemberReport() {
     let currentMember = null;
     let currentEmployeeId = null;
     try {
-        const memberStr = sessionStorage.getItem('currentMember');
+    const memberStr = sessionStorage.getItem('currentMember');
         if (memberStr) {
             currentMember = JSON.parse(memberStr);
             currentEmployeeId = currentMember ? currentMember.employeeId : null;
@@ -2402,9 +2443,9 @@ async function loadMemberReport() {
                     weeklyBlocked: window.weeklyReportsBlocked
                 });
                 
-                // 没有找到报告，清空表单（除了姓名）
-                clearFormExceptName();
-                // 注意：这里不清空reportId，让保存时自动生成新ID
+            // 没有找到报告，清空表单（除了姓名）
+            clearFormExceptName();
+            // 注意：这里不清空reportId，让保存时自动生成新ID
                 enableReportForm();
             }
         }
@@ -2428,7 +2469,7 @@ async function loadMemberReport() {
         if (!isExpectedError) {
             // 只有在真正的异常情况下才显示错误提示
             await log('warn', '显示错误提示给用户', { error: error.message });
-            alert('加载报告数据失败，请重试');
+        alert('加载报告数据失败，请重试');
         } else {
             await log('info', '忽略预期的错误，不显示错误提示', { error: error.message });
         }
@@ -3364,34 +3405,34 @@ async function filterLogs() {
     isFiltering = true;
     
     try {
-        const logType = document.getElementById('logTypeFilter').value;
-        const startDate = document.getElementById('startDateFilter').value;
-        const endDate = document.getElementById('endDateFilter').value;
+    const logType = document.getElementById('logTypeFilter').value;
+    const startDate = document.getElementById('startDateFilter').value;
+    const endDate = document.getElementById('endDateFilter').value;
+    
+    // 应用筛选条件
+    filteredLogs = allLogs.filter(log => {
+        // 类型筛选
+        if (logType !== 'all' && log.type !== logType) {
+            return false;
+        }
         
-        // 应用筛选条件
-        filteredLogs = allLogs.filter(log => {
-            // 类型筛选
-            if (logType !== 'all' && log.type !== logType) {
-                return false;
-            }
-            
-            // 开始日期筛选
-            if (startDate && log.date < startDate) {
-                return false;
-            }
-            
-            // 结束日期筛选
-            if (endDate && log.date > endDate) {
-                return false;
-            }
-            
-            return true;
-        });
+        // 开始日期筛选
+        if (startDate && log.date < startDate) {
+            return false;
+        }
         
-        // 重置当前页码
-        currentPage = 1;
+        // 结束日期筛选
+        if (endDate && log.date > endDate) {
+            return false;
+        }
         
-        // 重新渲染日志列表
+        return true;
+    });
+    
+    // 重置当前页码
+    currentPage = 1;
+    
+    // 重新渲染日志列表
         await renderLogs();
     } finally {
         isFiltering = false;
@@ -3423,26 +3464,26 @@ async function renderLogs() {
     isRendering = true;
     
     try {
-        const logsList = document.getElementById('logsList');
+    const logsList = document.getElementById('logsList');
         if (!logsList) {
             return;
         }
         
-        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-        
-        // 计算当前页的日志
-        const startIndex = (currentPage - 1) * logsPerPage;
-        const currentLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
-        
+    const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+    
+    // 计算当前页的日志
+    const startIndex = (currentPage - 1) * logsPerPage;
+    const currentLogs = filteredLogs.slice(startIndex, startIndex + logsPerPage);
+    
         // 清空列表（确保完全清空）
-        logsList.innerHTML = '';
-        
-        // 如果没有日志
-        if (currentLogs.length === 0) {
-            logsList.innerHTML = '<p class="no-logs">暂无历史日志</p>';
-            updatePagination(totalPages);
-            return;
-        }
+    logsList.innerHTML = '';
+    
+    // 如果没有日志
+    if (currentLogs.length === 0) {
+        logsList.innerHTML = '<p class="no-logs">暂无历史日志</p>';
+        updatePagination(totalPages);
+        return;
+    }
     
     // 获取所有成员数据，用于转换员工ID为姓名
     const allMembers = await getFromLocalStorage('members', []);
@@ -4209,13 +4250,13 @@ async function loadReportData() {
     
     // 渲染报告数据（按行展示，仅显示成员姓名和项目名称）
     let html = '<div class="report-list">';
-    filteredReports.forEach(report => {
-        // 存储报告数据为JSON字符串，用于点击时展示详情
-        const reportData = JSON.stringify(report).replace(/"/g, '&quot;');
+    filteredReports.forEach((report, index) => {
+        // 使用 data 属性存储报告数据，避免在 onclick 中直接使用复杂对象
+        const reportDataStr = JSON.stringify(report).replace(/'/g, "&#39;").replace(/"/g, '&quot;');
         
         html += `<div class="report-row">
-            <div style="flex: 1; cursor: pointer;" onclick="showReportDetail(${reportData})">
-                <span class="report-name">${report.memberName}</span>
+            <div style="flex: 1; cursor: pointer;" data-report-index="${index}" onclick="showReportDetailFromData(this)">
+                <span class="report-name">${escapeHtml(report.memberName || '未知成员')}</span>
             </div>
             <button onclick="deleteReport(${report.id}, event)" class="btn btn-remove">删除</button>
         </div>`;
@@ -4223,6 +4264,12 @@ async function loadReportData() {
     html += '</div>';
     
     reportDataElement.innerHTML = html;
+    
+    // 将报告数据存储到全局变量中，供点击时使用
+    if (!window.adminReportData) {
+        window.adminReportData = [];
+    }
+    window.adminReportData = filteredReports;
 }
 
 // 删除报告
@@ -4480,10 +4527,34 @@ function closeTodayProgressModal() {
 }
 
 // 显示报告详情弹窗
+// 存储当前编辑的报告数据
+let currentEditingReport = null;
+
+// HTML转义函数
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 从数据属性中获取报告并显示详情
+function showReportDetailFromData(element) {
+    const index = parseInt(element.getAttribute('data-report-index'));
+    if (window.adminReportData && window.adminReportData[index]) {
+        showReportDetail(window.adminReportData[index]);
+    } else {
+        showAlertModal('无法加载报告数据');
+    }
+}
+
 async function showReportDetail(report) {
     const modal = document.getElementById('reportDetailModal');
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
+    
+    // 存储当前报告数据，用于编辑
+    currentEditingReport = JSON.parse(JSON.stringify(report));
     
     // 获取成员列表用于ID转换
     const members = await getFromLocalStorage('members', []);
@@ -4569,6 +4640,9 @@ async function showReportDetail(report) {
 
     }
     
+    html += `<div style="margin-top: 20px; text-align: right;">
+        <button onclick="editReport()" class="btn btn-primary">编辑</button>
+    </div>`;
     html += `</div>`;
     modalBody.innerHTML = html;
     
@@ -4580,6 +4654,313 @@ async function showReportDetail(report) {
 function closeModal() {
     const modal = document.getElementById('reportDetailModal');
     modal.style.display = 'none';
+    currentEditingReport = null;
+}
+
+// 编辑报告
+async function editReport() {
+    if (!currentEditingReport) {
+        showAlertModal('无法编辑：报告数据不存在');
+        return;
+    }
+    
+    const modal = document.getElementById('reportDetailModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    
+    // 获取项目列表和成员列表
+    const projects = await getFromLocalStorage('projects', []);
+    const members = await getFromLocalStorage('members', []);
+    
+    // 设置弹窗标题
+    modalTitle.textContent = `编辑 - ${currentEditingReport.memberName} - ${currentEditingReport.type === 'daily' ? '日报' : '周报'}`;
+    
+    // 创建编辑表单
+    let html = `<div class="report-edit-form">
+        <p><strong>日期：</strong>${currentEditingReport.date}</p>
+        <p><strong>成员：</strong>${currentEditingReport.memberName}</p>`;
+    
+    if (currentEditingReport.type === 'daily') {
+        // 日报编辑表单
+        html += `
+            <h3>今日进展</h3>
+            <div id="editTodayProgress" class="content-group">`;
+        
+        if (currentEditingReport.todayProgress && currentEditingReport.todayProgress.length > 0) {
+            currentEditingReport.todayProgress.forEach((item, index) => {
+                html += createEditContentItem(item, 'editTodayProgress', index, false);
+            });
+        } else {
+            html += createEditContentItem(null, 'editTodayProgress', 0, false);
+        }
+        
+        html += `</div>
+            <button type="button" onclick="addEditContentItem('editTodayProgress', false)" class="btn btn-add">+ 添加今日进展</button>
+            
+            <h3>明日计划</h3>
+            <div id="editTomorrowPlan" class="content-group">`;
+        
+        if (currentEditingReport.tomorrowPlan && currentEditingReport.tomorrowPlan.length > 0) {
+            currentEditingReport.tomorrowPlan.forEach((item, index) => {
+                html += createEditContentItem(item, 'editTomorrowPlan', index, true);
+            });
+        } else {
+            html += createEditContentItem(null, 'editTomorrowPlan', 0, true);
+        }
+        
+        html += `</div>
+            <button type="button" onclick="addEditContentItem('editTomorrowPlan', true)" class="btn btn-add">+ 添加明日计划</button>`;
+    } else {
+        // 周报编辑表单
+        html += `
+            <h3>本周完成工作</h3>
+            <div id="editWeeklyDone" class="content-group">`;
+        
+        if (currentEditingReport.weeklyDone && currentEditingReport.weeklyDone.length > 0) {
+            currentEditingReport.weeklyDone.forEach((item, index) => {
+                html += createEditContentItem(item, 'editWeeklyDone', index, false);
+            });
+        } else {
+            html += createEditContentItem(null, 'editWeeklyDone', 0, false);
+        }
+        
+        html += `</div>
+            <button type="button" onclick="addEditContentItem('editWeeklyDone', false)" class="btn btn-add">+ 添加本周完成工作</button>
+            
+            <h3>下周工作计划</h3>
+            <div id="editWeeklyPlan" class="content-group">`;
+        
+        if (currentEditingReport.weeklyPlan && currentEditingReport.weeklyPlan.length > 0) {
+            currentEditingReport.weeklyPlan.forEach((item, index) => {
+                html += createEditContentItem(item, 'editWeeklyPlan', index, true);
+            });
+        } else {
+            html += createEditContentItem(null, 'editWeeklyPlan', 0, true);
+        }
+        
+        html += `</div>
+            <button type="button" onclick="addEditContentItem('editWeeklyPlan', true)" class="btn btn-add">+ 添加下周工作计划</button>`;
+    }
+    
+    html += `
+        <div style="margin-top: 20px; text-align: right;">
+            <button onclick="saveEditedReport()" class="btn btn-primary">保存</button>
+            <button onclick="cancelEditReport()" class="btn btn-secondary">取消</button>
+        </div>
+    </div>`;
+    
+    modalBody.innerHTML = html;
+    
+    // 初始化所有内容项的下拉框
+    await initEditContentItems();
+}
+
+// 创建编辑内容项HTML
+function createEditContentItem(item, containerId, index, isPlan) {
+    const project = item?.project || '';
+    const content = item?.content || '';
+    const members = item?.members || [];
+    const progress = item?.progress || '';
+    
+    let html = `<div class="content-item">
+        <select class="log-project" data-saved-project="${escapeHtml(project)}" required>
+            <option value="">请选择项目</option>`;
+    
+    // 项目选项将在初始化时动态加载
+    
+    html += `</select>
+        <div class="custom-select log-members">
+            <div class="select-trigger">
+                <div class="selected-tags"></div>
+                <span class="caret">▼</span>
+            </div>
+            <div class="select-dropdown">
+                <div class="dropdown-content">
+                    <!-- 成员选项将通过JavaScript动态生成 -->
+                </div>
+            </div>
+            <input type="hidden" class="selected-members" name="members" value="${members.join(',')}" required>
+        </div>
+        <input type="text" placeholder="请输入内容" value="${escapeHtml(content)}" required>`;
+    
+    if (!isPlan) {
+        html += `
+            <div class="progress-container">
+                <input type="number" class="log-progress" placeholder="进度" min="1" max="100" value="${progress}" required>
+                <span class="progress-percent">%</span>
+            </div>`;
+    }
+    
+    html += `
+        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+    </div>`;
+    
+    return html;
+}
+
+// 初始化编辑内容项
+async function initEditContentItems() {
+    const contentItems = document.querySelectorAll('#reportDetailModal .content-item');
+    
+    for (const item of contentItems) {
+        const projectSelect = item.querySelector('.log-project');
+        const membersSelect = item.querySelector('.log-members');
+        const contentInput = item.querySelector('input[type="text"]');
+        
+        if (projectSelect) {
+            await loadProjectsToDropdown(projectSelect);
+            // 恢复已选择的项目（从data属性中获取）
+            const savedProject = projectSelect.getAttribute('data-saved-project');
+            if (savedProject) {
+                projectSelect.value = savedProject;
+            }
+        }
+        
+        if (membersSelect) {
+            // 先获取已保存的成员ID（在加载之前）
+            const selectedMembersInput = membersSelect.querySelector('.selected-members');
+            let savedMemberIds = [];
+            if (selectedMembersInput && selectedMembersInput.value) {
+                savedMemberIds = selectedMembersInput.value.split(',').filter(id => id && id.trim());
+            }
+            
+            // 临时清除currentMember，避免默认选中管理员
+            const originalCurrentMember = sessionStorage.getItem('currentMember');
+            sessionStorage.removeItem('currentMember');
+            
+            // 加载成员数据（不会默认选中管理员）
+            await loadMembersToDropdown(membersSelect);
+            
+            // 恢复currentMember
+            if (originalCurrentMember) {
+                sessionStorage.setItem('currentMember', originalCurrentMember);
+            }
+            
+            // 等待一小段时间确保DOM更新完成
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // 确保选项已经加载后再渲染标签
+            const options = membersSelect.querySelectorAll('.dropdown-option');
+            if (options.length > 0 && savedMemberIds.length > 0) {
+                // 渲染已保存的成员标签（而不是默认的管理员）
+                renderSelectedTags(membersSelect, savedMemberIds);
+            }
+            
+            // 然后初始化自定义下拉框事件（在渲染标签之后）
+            initCustomMemberDropdown(membersSelect);
+        }
+    }
+}
+
+// 添加编辑内容项
+async function addEditContentItem(containerId, isPlan) {
+    const container = document.getElementById(containerId);
+    const newItem = document.createElement('div');
+    newItem.className = 'content-item';
+    
+    let innerHTML = `
+        <select class="log-project" required>
+            <option value="">请选择项目</option>
+        </select>
+        <div class="custom-select log-members">
+            <div class="select-trigger">
+                <div class="selected-tags"></div>
+                <span class="caret">▼</span>
+            </div>
+            <div class="select-dropdown">
+                <div class="dropdown-content">
+                    <!-- 成员选项将通过JavaScript动态生成 -->
+                </div>
+            </div>
+            <input type="hidden" class="selected-members" name="members" required>
+        </div>
+        <input type="text" placeholder="请输入内容" required>`;
+    
+    if (!isPlan) {
+        innerHTML += `
+            <div class="progress-container">
+                <input type="number" class="log-progress" placeholder="进度" min="1" max="100" required>
+                <span class="progress-percent">%</span>
+            </div>`;
+    }
+    
+    innerHTML += `
+        <button type="button" onclick="removeContentItem(this)" class="btn-remove">×</button>
+    `;
+    
+    newItem.innerHTML = innerHTML;
+    container.appendChild(newItem);
+    
+    // 初始化新添加的内容项
+    const projectSelect = newItem.querySelector('.log-project');
+    const membersSelect = newItem.querySelector('.log-members');
+    
+    if (projectSelect) {
+        await loadProjectsToDropdown(projectSelect);
+    }
+    
+    if (membersSelect) {
+        await loadMembersToDropdown(membersSelect);
+        initCustomMemberDropdown(membersSelect);
+    }
+}
+
+// 保存编辑后的报告
+async function saveEditedReport() {
+    if (!currentEditingReport) {
+        showAlertModal('无法保存：报告数据不存在');
+        return;
+    }
+    
+    try {
+        // 获取编辑后的数据
+        let updatedReport = JSON.parse(JSON.stringify(currentEditingReport));
+        
+        if (currentEditingReport.type === 'daily') {
+            // 获取今日进展和明日计划
+            updatedReport.todayProgress = getContentItems('editTodayProgress');
+            updatedReport.tomorrowPlan = getContentItems('editTomorrowPlan');
+        } else {
+            // 获取本周完成工作和下周工作计划
+            updatedReport.weeklyDone = getContentItems('editWeeklyDone');
+            updatedReport.weeklyPlan = getContentItems('editWeeklyPlan');
+        }
+        
+        // 获取所有报告
+        const reports = await getFromLocalStorage('reports', []);
+        
+        // 找到并更新报告
+        const reportIndex = reports.findIndex(r => r.id === currentEditingReport.id);
+        if (reportIndex !== -1) {
+            reports[reportIndex] = updatedReport;
+            
+            // 保存到服务器
+            await saveToLocalStorage('reports', reports);
+            
+            await log('info', '报告编辑保存成功', { reportId: updatedReport.id });
+            
+            // 更新当前编辑的报告数据
+            currentEditingReport = updatedReport;
+            
+            // 刷新数据列表
+            loadReportData();
+            
+            // 返回到日志详情页（查看模式）
+            showReportDetail(updatedReport);
+        } else {
+            showAlertModal('无法找到要更新的报告');
+        }
+    } catch (error) {
+        await log('error', '保存编辑后的报告失败', { error: error });
+        showAlertModal('保存失败: ' + error.message);
+    }
+}
+
+// 取消编辑
+function cancelEditReport() {
+    if (currentEditingReport) {
+        showReportDetail(currentEditingReport);
+    }
 }
 
 // 系统设置相关函数
