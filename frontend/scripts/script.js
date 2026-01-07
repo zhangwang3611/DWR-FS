@@ -319,9 +319,10 @@ async function initMemberPage() {
     // 初始化所有内容项的项目和成员下拉框
     await initContentItems();
     
-    // 加载该成员的报告和日志
+    // 加载该成员的报告
     await loadMemberReport();
-    await loadMemberLogs();
+    // 登录时不加载所有历史日志，只检查当天的日志
+    // await loadMemberLogs();
     
     // 表单提交事件
     const reportForm = document.getElementById('reportForm');
@@ -2521,13 +2522,21 @@ async function checkIfMemberIncludedInOtherReports(reports, date, reportType, cu
         return [];
     }
     
-    // 遍历当天的所有报告（使用 for...of 以支持 await）
-    for (let index = 0; index < reports.length; index++) {
-        const report = reports[index];
-        // 检查日期和类型是否匹配
-        if (report.date !== date || report.type !== reportType) {
-            continue; // 跳过不匹配的报告，继续下一个
-        }
+    // 优化：先过滤出符合日期和类型的报告，减少后续循环次数
+    const filteredReports = reports.filter(report => {
+        return report.date === date && report.type === reportType;
+    });
+    
+    await log('debug', '过滤后符合条件的报告数量', {
+        originalCount: reports.length,
+        filteredCount: filteredReports.length,
+        date: date,
+        reportType: reportType
+    });
+    
+    // 遍历过滤后的报告（使用 for...of 以支持 await）
+    for (let index = 0; index < filteredReports.length; index++) {
+        const report = filteredReports[index];
         
         await log('debug', `检查报告 ${index + 1}`, {
             reportId: report.id,
