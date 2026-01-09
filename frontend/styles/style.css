@@ -72,6 +72,24 @@ h3 {
     background-color: #7f8c8d;
 }
 
+.btn-info {
+    background-color: #27ae60;
+    color: #fff;
+}
+
+.btn-info:hover {
+    background-color: #219150;
+}
+
+.btn-warning {
+    background-color: #e67e22;
+    color: #fff;
+}
+
+.btn-warning:hover {
+    background-color: #d35400;
+}
+
 .btn-orange {
     background-color: #3d2fc0;
     color: #fff;
@@ -227,6 +245,15 @@ h3 {
     padding: 20px;
     max-width: 350px;
     max-height: 250px;
+}
+
+/* 确认弹窗特定样式 */
+.confirm-modal {
+    width: 50%;
+    max-width: 500px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* 成员确认弹窗特定样式 */
@@ -1143,6 +1170,20 @@ textarea {
     border-top: 1px solid #e9ecef;
 }
 
+.confirm-modal .modal-body {
+    padding: 20px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.confirm-modal .modal-footer {
+    display: flex;
+    justify-content: center;
+    padding: 15px 20px;
+    border-top: 1px solid #e9ecef;
+    gap: 10px;
+}
+
 /* 项目活动图表样式 */
 #activity {
     padding: 20px;
@@ -1366,6 +1407,27 @@ textarea {
 .log-type-weekly {
     background-color: #f3e5f5;
     color: #7b1fa2;
+}
+
+/* 填充到表单按钮样式 */
+.btn-fill-form {
+    padding: 5px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.3s;
+    white-space: nowrap;
+}
+
+.btn-fill-form:hover {
+    background-color: #45a049;
+}
+
+.btn-fill-form:active {
+    background-color: #3d8b40;
 }
 
 /* 日志详情样式 */

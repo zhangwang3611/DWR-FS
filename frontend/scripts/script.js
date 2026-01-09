@@ -127,6 +127,9 @@ function confirmMember() {
         // 将成员信息存储在sessionStorage中，供member.html使用
         sessionStorage.setItem('currentMember', JSON.stringify(currentMember));
         
+        // 同时保存到localStorage，用于下次自动登录
+        localStorage.setItem('cachedMember', JSON.stringify(currentMember));
+        
         // 关闭弹窗并跳转到成员页面
         closeMemberConfirm();
         window.location.href = 'frontend/pages/member.html';
@@ -154,6 +157,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     } else if (pathname.includes('member.html')) {
         // 检查是否通过成员入口验证
         let memberStr = sessionStorage.getItem('currentMember');
+        
+        // 如果sessionStorage中没有，尝试从localStorage获取缓存的用户
+        if (!memberStr) {
+            const cachedMember = localStorage.getItem('cachedMember');
+            if (cachedMember) {
+                memberStr = cachedMember;
+                sessionStorage.setItem('currentMember', cachedMember);
+            }
+        }
     
         if (!memberStr && !document.referrer.includes('index.html')) {
             alert('您没有权限直接访问此页面，请从首页进入');
@@ -162,6 +174,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         initMemberPage();
         await log('info', 'Member page initialized');
+    } else if (pathname === '/' || pathname.includes('index.html')) {
+        // 首页：检查是否有缓存的用户，如果有则自动登录
+        const cachedMember = localStorage.getItem('cachedMember');
+        if (cachedMember) {
+            try {
+                const member = JSON.parse(cachedMember);
+                // 设置当前成员信息
+                sessionStorage.setItem('currentMember', cachedMember);
+                // 直接跳转到成员页面
+                window.location.href = 'frontend/pages/member.html';
+                return;
+            } catch (error) {
+                await log('error', '解析缓存的用户信息失败', { error: error });
+                // 解析失败，清除缓存
+                localStorage.removeItem('cachedMember');
+            }
+        }
     }
     
     // 为首页的成员入口按钮添加点击事件
@@ -1486,12 +1515,80 @@ async function saveReport() {
             // 保存成功后，将reportId设置回页面，以便下次更新
             document.getElementById('reportId').value = reportData.id;
                 
-                // 显示成功消息
-                showAlertModal('报告保存成功！');
-                
-                // 如果是日报，显示跳转数字神经按钮
+                // 如果是日报，显示跳转数字神经按钮，检查是否是周五，如果是则提醒填写周报
                 if (reportType === 'daily') {
                     showJumpButton();
+                    
+                    // 检查是否是周五
+                    const today = new Date();
+                    const dayOfWeek = today.getDay(); // 0-6, 0是周日，5是周五
+                    
+                    if (dayOfWeek === 5) {
+                        // 检查本周周报是否已填写
+                        const memberStr = sessionStorage.getItem('currentMember');
+                        if (memberStr) {
+                            const currentMember = JSON.parse(memberStr);
+                            const currentEmployeeId = currentMember.employeeId;
+                            
+                            // 计算本周的周一和周日
+                            const currentDay = new Date(today);
+                            const day = currentDay.getDay();
+                            const diff = currentDay.getDate() - day + (day === 0 ? -6 : 1);
+                            const monday = new Date(currentDay.setDate(diff));
+                            const sunday = new Date(monday);
+                            sunday.setDate(monday.getDate() + 6);
+                            
+                            // 格式化日期为 YYYY-MM-DD
+                            const formatDate = (date) => {
+                                const year = date.getFullYear();
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const day = String(date.getDate()).padStart(2, '0');
+                                return `${year}-${month}-${day}`;
+                            };
+                            
+                            const mondayStr = formatDate(monday);
+                            const sundayStr = formatDate(sunday);
+                            
+                            // 获取所有报告数据
+                            const reports = await getFromLocalStorage('reports', []);
+                            
+                            // 检查本周是否有周报
+                            const hasWeeklyReport = reports.some(report => 
+                                report.employeeId === currentEmployeeId && 
+                                report.type === 'weekly' && 
+                                report.date >= mondayStr && 
+                                report.date <= sundayStr
+                            );
+                            
+                            if (!hasWeeklyReport) {
+                                // 本周未填写周报，创建周报提醒回调函数
+                                const weeklyReminderCallback = () => {
+                                    showConfirmModal('今天是周五，您是否需要填写周报？', (confirmed) => {
+                                        if (confirmed) {
+                                            // 切换到周报类型
+                                            document.getElementById('reportType').value = 'weekly';
+                                            toggleReportType();
+                                        }
+                                    });
+                                };
+                                
+                                // 显示成功消息，并传入回调函数
+                                showAlertModal('报告保存成功！', weeklyReminderCallback);
+                            } else {
+                                // 本周已填写周报，只显示成功消息
+                                showAlertModal('报告保存成功！');
+                            }
+                        } else {
+                            // 没有成员信息，只显示成功消息
+                            showAlertModal('报告保存成功！');
+                        }
+                    } else {
+                        // 不是周五，只显示成功消息
+                        showAlertModal('报告保存成功！');
+                    }
+                } else {
+                    // 周报，只显示成功消息
+                    showAlertModal('报告保存成功！');
                 }
                 
                 isSavingReport = false;
@@ -2105,18 +2202,67 @@ function showSuccessMessage() {
 }
 
 // 显示提示弹窗
-function showAlertModal(message) {
+function showAlertModal(message, callback = null) {
     const modal = document.getElementById('alertModal');
     const messageElement = document.getElementById('alertMessage');
     
     messageElement.textContent = message;
     modal.style.display = 'block';
+    
+    // 如果有回调函数，存储在modal上，供关闭时使用
+    if (callback) {
+        modal.dataset.callback = 'true';
+        modal.callbackFunction = callback;
+    } else {
+        delete modal.dataset.callback;
+        delete modal.callbackFunction;
+    }
 }
 
 // 关闭提示弹窗
 function closeAlertModal() {
     const modal = document.getElementById('alertModal');
     modal.style.display = 'none';
+    
+    // 如果有回调函数，执行它
+    if (modal.dataset.callback === 'true' && modal.callbackFunction) {
+        const callback = modal.callbackFunction;
+        delete modal.dataset.callback;
+        delete modal.callbackFunction;
+        callback();
+    }
+}
+
+// 显示确认弹窗
+function showConfirmModal(message, callback = null) {
+    const modal = document.getElementById('confirmModal');
+    const messageElement = document.getElementById('confirmMessage');
+    
+    messageElement.textContent = message;
+    modal.style.display = 'block';
+    
+    // 如果有回调函数，存储在modal上，供关闭时使用
+    if (callback) {
+        modal.dataset.callback = 'true';
+        modal.callbackFunction = callback;
+    } else {
+        delete modal.dataset.callback;
+        delete modal.callbackFunction;
+    }
+}
+
+// 关闭确认弹窗
+function closeConfirmModal(confirmed) {
+    const modal = document.getElementById('confirmModal');
+    modal.style.display = 'none';
+    
+    // 如果有回调函数，执行它，并传入确认结果
+    if (modal.dataset.callback === 'true' && modal.callbackFunction) {
+        const callback = modal.callbackFunction;
+        delete modal.dataset.callback;
+        delete modal.callbackFunction;
+        callback(confirmed);
+    }
 }
 
 // 带入昨日报告内容
@@ -2177,6 +2323,59 @@ async function loadYesterdayReport() {
     } catch (error) {
         await log('error', '加载昨日报告失败', { error: error });
         showAlertModal('加载昨日报告失败，请重试');
+    }
+}
+
+// 根据日期加载报告并填充到表单
+async function loadReportByDate(date, reportType) {
+    // 从sessionStorage获取当前成员信息
+    const memberStr = sessionStorage.getItem('currentMember');
+    
+    if (!memberStr) {
+        showError('memberNameError', '请先完成成员身份验证');
+        return;
+    }
+    
+    const currentMember = JSON.parse(memberStr);
+    const currentEmployeeId = currentMember.employeeId;
+    
+    try {
+        // 获取所有报告数据
+        const reports = await getFromLocalStorage('reports', []);
+        
+        // 查找指定日期的报告
+        const targetReport = reports.find(report => 
+            report.employeeId === currentEmployeeId && 
+            report.type === reportType && 
+            report.date === date
+        );
+        
+        if (targetReport) {
+            // 填充报告内容
+            if (reportType === 'daily') {
+                // 填充今日进展
+                await fillContentItems('todayProgress', targetReport.todayProgress || []);
+                // 填充明日计划
+                await fillContentItems('tomorrowPlan', targetReport.tomorrowPlan || []);
+            } else {
+                // 填充本周完成工作
+                await fillContentItems('weeklyDone', targetReport.weeklyDone || []);
+                // 填充下周工作计划
+                await fillContentItems('weeklyPlan', targetReport.weeklyPlan || []);
+            }
+            
+            // 关闭日志弹窗
+            closeLogsModal();
+            
+            // 显示成功消息
+            showAlertModal(`${date}的${reportType === 'daily' ? '日报' : '周报'}内容已成功带入！`);
+        } else {
+            // 没有找到指定日期的报告
+            showAlertModal(`未找到${date}的${reportType === 'daily' ? '日报' : '周报'}数据`);
+        }
+    } catch (error) {
+        await log('error', '加载指定日期报告失败', { error: error, date: date, reportType: reportType });
+        showAlertModal('加载报告失败，请重试');
     }
 }
 
@@ -3554,12 +3753,16 @@ async function renderLogs() {
             `;
         }
         
+        // 获取当前选择的报告类型
+        const currentReportType = document.getElementById('reportType').value;
+        
         // 设置日志条目HTML
         logItem.innerHTML = `
             <div class="log-header">
                 <span class="log-date">${log.date}</span>
                 <span class="log-member">${log.memberName}</span>
                 <span class="log-type log-type-${log.type}">${log.type === 'daily' ? '日报' : '周报'}</span>
+                ${log.type === currentReportType ? `<button type="button" class="btn btn-fill-form" onclick="loadReportByDate('${log.date}', '${log.type}')">填充到表单</button>` : ''}
             </div>
             <div class="log-content-view">
                 ${logContent}
@@ -3622,6 +3825,16 @@ function showLogsModal() {
 function closeLogsModal() {
     const modal = document.getElementById('logsModal');
     modal.style.display = 'none';
+}
+
+// 切换用户
+function switchUser() {
+    // 清除缓存的用户信息
+    localStorage.removeItem('cachedMember');
+    sessionStorage.removeItem('currentMember');
+    
+    // 跳转到首页
+    window.location.href = '/index.html';
 }
 
 // 初始化日志相关事件监听器

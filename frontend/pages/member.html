@@ -10,12 +10,12 @@
     <div class="container">
         <h1>日报周报填写</h1>
         <div class="header-buttons">
-            <button onclick="loadYesterdayReport()" class="btn btn-secondary btn-load-yesterday">填充昨日内容</button>
-            <button onclick="showLogsModal()" class="btn btn-secondary">查看历史日志</button>
-            <button onclick="sessionStorage.removeItem('currentMember'); window.location.href='/index.html'" class="btn btn-back">返回首页</button>
+            <button onclick="loadYesterdayReport()" class="btn btn-primary btn-load-yesterday">填充昨日内容</button>
+            <button onclick="showLogsModal()" class="btn btn-info">查看历史日志</button>
+            <button onclick="switchUser()" class="btn btn-warning">切换用户</button>
         </div>
         
-        <form id="reportForm">
+        <form id="reportForm" onsubmit="return false;">
             <!-- 成员姓名（隐藏字段，用于显示当前用户） -->
             <input type="hidden" id="memberName">
             <!-- 报告类型、当前用户、当前日期在同一行 -->
@@ -242,6 +242,23 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" onclick="closeAlertModal()">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 确认弹窗 -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-modal">
+            <div class="modal-header">
+                <h2>确认</h2>
+                <span class="close" onclick="closeConfirmModal(false)">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="confirmMessage"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal(false)">取消</button>
+                <button type="button" class="btn btn-primary" onclick="closeConfirmModal(true)">确定</button>
             </div>
         </div>
     </div>
